@@ -1,0 +1,67 @@
+/* =========================================================
+   Tokens de diseño · Panel de Vida
+   Estilo: minimalista «Grafito», oscuro neutro, sin brillos.
+   Cambia aquí los colores y todo el panel se adapta.
+   ========================================================= */
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("../fonts/inter-latin.woff2") format("woff2");
+}
+
+:root {
+  color-scheme: dark;
+
+  /* Fondo grafito */
+  --night: #0e0f11;
+  --night-2: #0e0f11;
+
+  /* Superficies y líneas */
+  --surface: #17181b;
+  --surface-solid: #17181b;
+  --surface-2: #1d1e22;
+  --line: #26282c;
+  --line-soft: #202226;
+
+  /* Texto */
+  --fg: #ececee;
+  --muted: #8b9099;
+  --dim: #5d626b;
+
+  /* Acento de interfaz y XP (azul suave; se mantiene el nombre --cyan) */
+  --cyan: #7cc4e4;
+  --cyan-deep: #5fb0d6;
+
+  /* Un color por área */
+  --fin: #7fcf9b;     /* Finanzas */
+  --work: #7ea6f0;    /* Trabajo y estudios */
+  --hab: #e88fb4;     /* Hábitos y deporte */
+  --agenda: #e0b467;  /* Agenda y tareas */
+
+  /* Estados */
+  --ok: #7fcf9b;
+  --warn: #e0b467;
+  --danger: #e5736b;
+
+  /* Tipografía */
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 22px;
+  --fs-xxl: 28px;
+
+  /* Forma */
+  --r: 14px;
+  --r-lg: 14px;
+  --gap: 14px;
+
+  /* Áreas seguras de iPhone */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --tabbar-h: 58px;
+}

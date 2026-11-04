@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Deep graphite radial ambient -->
+    <radialGradient id="bgGlow" cx="50%" cy="45%" r="65%">
+      <stop offset="0%" stop-color="#181c24"/>
+      <stop offset="65%" stop-color="#0e0f11"/>
+      <stop offset="100%" stop-color="#090a0c"/>
+    </radialGradient>
+
+    <!-- Harmonious 4-color gradient representing the 4 areas of Life -->
+    <linearGradient id="lifeGrad" x1="10%" y1="10%" x2="90%" y2="90%">
+      <stop offset="0%" stop-color="#38bdf8"/>   <!-- Cyan / Focus & XP -->
+      <stop offset="35%" stop-color="#818cf8"/>  <!-- Indigo / Trabajo -->
+      <stop offset="70%" stop-color="#f472b6"/>  <!-- Rose / Hábitos -->
+      <stop offset="100%" stop-color="#34d399"/> <!-- Emerald / Finanzas -->
+    </linearGradient>
+
+    <!-- Ambient glow filter -->
+    <filter id="bloom" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="24" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" fill="url(#bgGlow)"/>
+
+  <!-- Subtle orbit ring -->
+  <circle cx="256" cy="256" r="175" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="2.5"/>
+
+  <!-- Glowing Emblem -->
+  <g filter="url(#bloom)">
+    <!-- Outer Star -->
+    <path d="M 256,111 
+             C 270,183 329,242 401,256 
+             C 329,270 270,329 256,401 
+             C 242,329 183,270 111,256 
+             C 183,242 242,183 256,111 Z" 
+          fill="url(#lifeGrad)"/>
+
+    <!-- Inner Core Cutout -->
+    <path d="M 256,198 
+             C 262,226 286,250 314,256 
+             C 286,262 262,286 256,314 
+             C 250,286 226,262 198,256 
+             C 226,250 250,226 256,198 Z" 
+          fill="#0e0f11"/>
+
+    <!-- Center Luminous Seed -->
+    <circle cx="256" cy="256" r="16" fill="#7dd3fc" fill-opacity="0.9"/>
+    <circle cx="256" cy="256" r="7" fill="#ffffff"/>
+  </g>
+
+  <!-- 4 Pillar Satellites -->
+  <circle cx="256" cy="81" r="5.5" fill="#38bdf8"/>
+  <circle cx="431" cy="256" r="5.5" fill="#818cf8"/>
+  <circle cx="256" cy="431" r="5.5" fill="#34d399"/>
+  <circle cx="81" cy="256" r="5.5" fill="#f472b6"/>
+</svg>
