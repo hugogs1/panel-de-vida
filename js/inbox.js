@@ -64,7 +64,8 @@ export function applyInbox(s, messages, today = iso()) {
 
   for (const { name, text } of messages) {
     const m = parseMessage(text);
-    const id = `ibx-${name.replace(/\.[a-z]+$/i, "")}`;
+    const hash = (str => { let h = 0; for (let i = 0; i < str.length; i++) { h = ((h << 5) - h) + str.charCodeAt(i); h |= 0; } return (h >>> 0).toString(36); })(text || "");
+    const id = `ibx-${name.replace(/\.[a-z]+$/i, "")}-${hash}`;
     const tipo = norm(m.tipo);
     if (seen.has(id)) continue;      // ya procesado (en este u otro dispositivo)
     seen.add(id);
