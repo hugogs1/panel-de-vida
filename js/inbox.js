@@ -102,12 +102,26 @@ export function applyInbox(s, messages, today = iso()) {
       const p = m.proyecto && s.work.projects.find(x => !x.archived && norm(x.name).includes(norm(m.proyecto)));
       s.work.entries.push({ id, date: parseDay(m.fecha, today) || today, minutes, kind, projectId: p?.id || null, note: m.nota || "", source: "siri" });
       done.push(`${minutes >= 60 ? `${String(Math.round(minutes / 6) / 10).replace(".", ",")} h` : `${minutes} min`} de ${kind}`);
-    } else if (tipo === "gimnasio" || tipo === "futbol") {
+    } else if (tipo === "gimnasio" || tipo === "gym" || tipo === "futbol" || tipo === "entreno") {
       const minutes = Math.round(num(m.minutos)) || (tipo === "futbol" ? 90 : 60);
       const date = parseDay(m.fecha, today) || today;
-      if (tipo === "gimnasio") s.habits.workouts.push({ id, date, type: "gym", routineId: null, minutes, exercises: [], note: "Desde Siri", source: "siri" });
-      else s.habits.workouts.push({ id, date, type: "futbol", kind: ["si", "sí", "partido"].includes(norm(m.partido)) ? "partido" : "entrenamiento", minutes, note: "", source: "siri" });
-      done.push(`${tipo === "gimnasio" ? "gimnasio" : "fútbol"} ${minutes} min`);
+      const isFutbol = tipo === "futbol" || ["si", "sí", "partido"].includes(norm(m.partido)) || /futbol|fútbol/i.test(m.nombre || "");
+      if (isFutbol) {
+        s.habits.workouts.push({ id, date, type: "futbol", kind: ["si", "sí", "partido"].includes(norm(m.partido)) ? "partido" : "entrenamiento", minutes, note: m.nota || "", source: "salud" });
+        done.push(`fútbol ${minutes} min`);
+      } else {
+        const title = (m.nombre || m.titulo || "Gimnasio").trim();
+        s.habits.workouts.push({ id, date, type: "gym", routineId: null, title, minutes, exercises: [], note: m.nota || "Desde Salud/Hevy", source: "salud" });
+        done.push(`gimnasio ${minutes} min`);
+      }
+    } else if (tipo === "sueno" || tipo === "dormir") {
+      const hours = num(m.horas);
+      if (!(hours >= 0 && hours <= 24)) { skipped.push("horas de sueño no válidas"); continue; }
+      const quality = Math.min(5, Math.max(1, Math.round(num(m.calidad)))) || 3;
+      const date = parseDay(m.fecha, today) || today;
+      s.habits.sleep = (s.habits.sleep || []).filter(x => x.date !== date);
+      s.habits.sleep.push({ id, date, hours: Math.round(hours * 10) / 10, quality });
+      done.push(`${String(Math.round(hours * 10) / 10).replace(".", ",")} h de sueño`);
     } else if (tipo === "cuerpo") {
       const data = { weight: num(m.peso), fat: num(m.grasa), waist: num(m.cintura) };
       Object.keys(data).forEach(k => { if (!(data[k] > 0)) delete data[k]; });

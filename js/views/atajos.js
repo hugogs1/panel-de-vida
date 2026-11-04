@@ -146,6 +146,24 @@ function openGuide() {
       `Nota: el iPhone no deja que una notificación de Atajos abra directamente una app web como esta; al tocarla se abre Atajos. Abre Panel de Vida desde su icono.`
     ])}
 
+    ${shortcut("11 · Sueño de Xiaomi / Apple Salud (cada mañana a las 8:30)", "", [
+      `En <b>Mi Fitness</b>: Perfil → Datos de terceros / Conectar con Apple Salud (activa Sueño, Pasos y Entrenos).`,
+      `Crea un atajo <b>Sueño al Panel</b>: acción <b>Buscar muestras de salud</b> → tipo <b>Análisis del sueño</b>, <i>Fecha de finalización</i> <b>es hoy</b>.`,
+      `Acción <b>Calcular estadísticas</b> → <b>Suma</b> de la duración (en horas).`,
+      `Acción <b>Texto</b>:` + txt("tipo: sueno\nhoras: [Estadísticas de duración]\ncalidad: 4"),
+      send,
+      `Pestaña <b>Automatización</b> → <b>+</b> → <b>Hora del día</b> → <b>08:30</b>, <b>Diariamente</b> → <b>Ejecutar inmediatamente</b> → elige <b>Sueño al Panel</b>. Rellenará automáticamente tu gráfica de descanso.`
+    ])}
+
+    ${shortcut("12 · Entrenos automáticos de Hevy / Xiaomi a Salud", "", [
+      `En <b>Hevy</b>: Perfil → Ajustes → Apple Salud (activa los permisos de escritura de Entrenamientos).`,
+      `Crea un atajo <b>Entreno al Panel</b>: <b>Buscar muestras de salud</b> → tipo <b>Entrenamientos</b>, <i>Fecha de inicio</i> <b>es hoy</b>, ordenar por fecha más reciente primero, límite 1.`,
+      `Acción <b>Texto</b>:` + txt("tipo: gimnasio\nminutos: [Duración en minutos del entrenamiento]"),
+      send,
+      `Pestaña <b>Automatización</b> → <b>+</b> → <b>Al finalizar un entrenamiento</b> (o a las <b>21:30 Diariamente</b>) → <b>Ejecutar inmediatamente</b> → elige <b>Entreno al Panel</b>.`,
+      `Sumará tus minutos, XP y racha de gimnasio automáticamente. Para importar pesos, ejercicios y récords detallados de Hevy, usa <b>Ajustes → Hevy → Importar CSV</b>.`
+    ])}
+
     <p class="hint">Para comprobar que todo funciona, usa <b>Enviar mensaje de prueba</b> en Ajustes, o ejecuta un atajo y luego abre la app: verás un aviso con lo recibido.</p>
     <button class="btn primary" type="button" data-close>Entendido</button>`);
 
