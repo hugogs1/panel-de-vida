@@ -5,6 +5,8 @@
 //   set_index, set_type, weight_kg (o weight_lbs), reps, distance_km, duration_seconds, rpe
 // Un entreno = filas con el mismo title + start_time + end_time.
 
+import { ensureAutoHabits } from "./state.js";
+
 const MONTHS = { jan: 1, ene: 1, feb: 2, mar: 3, apr: 4, abr: 4, may: 5, jun: 6, jul: 7, aug: 8, ago: 8, sep: 9, sept: 9, set: 9, oct: 10, nov: 11, dec: 12, dic: 12 };
 
 /** CSV con comillas, comas y saltos de línea dentro de campos */
@@ -105,5 +107,6 @@ export function applyHevy(s, workouts) {
   }
   s.settings.gymSource = "hevy";
   s.settings.lastHevyImport = new Date().toISOString();
+  ensureAutoHabits(s);
   return { added, updated, total: workouts.length };
 }

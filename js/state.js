@@ -67,13 +67,43 @@ function fillDefaults(target, defaults) {
 // Migraciones entre versiones del formato: { 2: s => { ...; return s; } }
 const migrations = {};
 
+export function ensureAutoHabits(s) {
+  if (!s || !s.habits) return s;
+  s.habits.habits ||= [];
+  s.habits.workouts ||= [];
+
+  const hasGymWorkouts = s.habits.workouts.some(w => w.type === "gym");
+  const hasGymHabit = s.habits.habits.some(h => !h.archived && (h.auto === "gym" || h.auto === "any"));
+  if (hasGymWorkouts && !hasGymHabit) {
+    const existing = s.habits.habits.find(h => !h.archived && /gimnasio|gym|entren/i.test(h.name));
+    if (existing) {
+      existing.auto = "gym";
+    } else {
+      const firstWorkout = [...s.habits.workouts].filter(w => w.type === "gym").sort((a, b) => a.date.localeCompare(b.date))[0];
+      s.habits.habits.push({
+        id: "hb-gimnasio-auto",
+        name: "Gimnasio",
+        unit: "entreno",
+        target: 1,
+        step: 1,
+        frequency: { type: "weekly", times: 4 },
+        auto: "gym",
+        archived: false,
+        createdAt: firstWorkout?.date || new Date().toISOString().slice(0, 10)
+      });
+    }
+  }
+  return s;
+}
+
 export function migrate(data) {
   let s = data;
   for (let v = (s.version || 1) + 1; v <= SCHEMA_VERSION; v++) {
     if (migrations[v]) s = migrations[v](s);
     s.version = v;
   }
-  return fillDefaults(s, defaultState());
+  s = fillDefaults(s, defaultState());
+  return ensureAutoHabits(s);
 }
 
 // ---- Almacén en memoria con suscriptores
