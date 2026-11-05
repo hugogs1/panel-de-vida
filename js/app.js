@@ -14,7 +14,6 @@ import { requestPersistence } from "./db.js";
 import { toast, closeSheet } from "./ui.js";
 import * as resumen from "./views/resumen.js";
 import * as finanzas from "./views/finanzas.js";
-import * as trabajo from "./views/trabajo.js";
 import * as habitos from "./views/habitos.js";
 import * as agenda from "./views/agenda.js";
 import * as ajustes from "./views/ajustes.js";
@@ -22,11 +21,10 @@ import * as logros from "./views/logros.js";
 import * as semana from "./views/semana.js";
 
 const ROUTES = {
-  resumen:  { view: resumen,  title: "Resumen" },
-  finanzas: { view: finanzas, title: "Finanzas",           area: "fin" },
-  trabajo:  { view: trabajo,  title: "Trabajo y estudios", area: "work" },
-  habitos:  { view: habitos,  title: "Hábitos y deporte",  area: "hab" },
-  agenda:   { view: agenda,   title: "Agenda",             area: "ag" },
+  resumen:  { view: resumen,  title: "Agenda Hoy",        area: "resumen" },
+  finanzas: { view: finanzas, title: "Cartera y Finanzas", area: "fin" },
+  habitos:  { view: habitos,  title: "Hábitos y Deporte",  area: "hab" },
+  agenda:   { view: agenda,   title: "Agenda y Tareas",    area: "ag" },
   ajustes:  { view: ajustes,  title: "Ajustes" },
   logros:   { view: logros,   title: "Logros" },
   semana:   { view: semana,   title: "Semanas" }
@@ -38,6 +36,7 @@ let mountCtl = null;
 
 const routeName = () => {
   const r = location.hash.replace("#", "");
+  if (r === "trabajo") return "resumen";
   return ROUTES[r] ? r : "resumen";
 };
 
@@ -102,7 +101,7 @@ function receiveInbox(messages) {
   if (res.skipped.length) setTimeout(() => toast(`No se pudo apuntar: ${res.skipped.join(" · ")}`, { error: true, ms: 5000 }), res.done.length ? 5200 : 0);
 }
 
-// Atajos de teclado (ordenador): N = apuntar algo, 1-5 = secciones, Esc = cerrar
+// Atajos de teclado (ordenador): N = apuntar algo, 1-4 = secciones, Esc = cerrar
 function initShortcuts() {
   document.addEventListener("keydown", e => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -110,7 +109,7 @@ function initShortcuts() {
     if (t.closest?.("input, textarea, select, [contenteditable]")) return;
     const sheetOpen = !!document.querySelector("#sheet-root .sheet, .levelup");
     if ((e.key === "n" || e.key === "N") && !sheetOpen) { e.preventDefault(); openQuickAdd(); }
-    else if (/^[1-5]$/.test(e.key) && !sheetOpen) { location.hash = "#" + SHORTCUT_ROUTES[Number(e.key) - 1]; }
+    else if (/^[1-4]$/.test(e.key) && !sheetOpen) { location.hash = "#" + SHORTCUT_ROUTES[Number(e.key) - 1]; }
     else if (e.key === "Escape") closeSheet();
   });
 }

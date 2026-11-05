@@ -10,7 +10,6 @@ import { meets } from "./habits.js";
 
 export const AREAS = {
   fin:  { key: "fin",  name: "Finanzas",           short: "Finanzas", color: "var(--fin)",    hex: "#7fcf9b", route: "finanzas" },
-  work: { key: "work", name: "Trabajo y estudios", short: "Trabajo",  color: "var(--work)",   hex: "#7ea6f0", route: "trabajo" },
   hab:  { key: "hab",  name: "Hábitos y deporte",  short: "Hábitos",  color: "var(--hab)",    hex: "#e88fb4", route: "habitos" },
   ag:   { key: "ag",   name: "Agenda y tareas",    short: "Agenda",   color: "var(--agenda)", hex: "#e0b467", route: "agenda" }
 };
@@ -227,13 +226,6 @@ export const ACHIEVEMENTS = [
   ["fin-goal", "fin", "Objetivo cumplido", "Consigue una meta de ahorro", s => [s.goalsReached, 1]],
   ["fin-green", "fin", "Mes en verde", "Cierra un mes con balance positivo", s => [s.positiveMonths, 1]],
   ["fin-green6", "fin", "Seis meses en verde", "Cierra 6 meses con balance positivo", s => [s.positiveMonths, 6]],
-
-  ["work-1h", "work", "Primera hora", "Registra tu primera hora de trabajo o estudio", s => [Math.floor(s.workHours), 1]],
-  ["work-100h", "work", "Cien horas", "Registra 100 horas", s => [Math.floor(s.workHours), 100]],
-  ["work-500h", "work", "Maratón", "Registra 500 horas", s => [Math.floor(s.workHours), 500]],
-  ["work-ms10", "work", "Paso a paso", "Completa 10 hitos", s => [s.milestones, 10]],
-  ["work-project", "work", "Misión cumplida", "Completa un proyecto", s => [s.projectsDone, 1]],
-  ["work-learn", "work", "Mente curiosa", "Termina un curso, libro o habilidad", s => [s.learnDone, 1]],
 
   ["hab-first", "hab", "Buen comienzo", "Cumple un hábito por primera vez", s => [s.habitDays, 1]],
   ["hab-perfect", "hab", "Día perfecto", "Cumple todos los hábitos de un día", s => [s.perfectDays, 1]],

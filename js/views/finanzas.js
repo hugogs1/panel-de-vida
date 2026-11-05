@@ -1,4 +1,4 @@
-// Finanzas: saldo, movimientos, gastos por categoría, fijos, metas y cuentas.
+// Finanzas: Cartera inteligente, balance mensual, asesor de viabilidad, gastos fijos y cuentas.
 
 import { areaHeader } from "./area.js";
 import { esc, money } from "../ui.js";
@@ -6,13 +6,26 @@ import { icon } from "../icons.js";
 import { iso, parseISO } from "../stats.js";
 import { areaChart, ring } from "../charts.js";
 import { registerQuickAction } from "../quickadd.js";
-import { ACCOUNT_TYPES, FREQS, accountBalance, totalBalance, monthSummary, balanceHistory, catLabel, catColor } from "../finance.js";
-import { openTxForm, openAccountForm, openRecurringForm, openGoalForm, openContribute, openCategories } from "./finanzas-forms.js";
+import {
+  ACCOUNT_TYPES, FREQS, accountBalance, totalBalance, monthSummary,
+  balanceHistory, catLabel, catColor, getWalletBudget, checkExpenseViability,
+  perMonth, parseAmount
+} from "../finance.js";
+import {
+  openTxForm, openAccountForm, openRecurringForm, openGoalForm,
+  openContribute, openCategories, openMonthlyIncomeForm
+} from "./finanzas-forms.js";
 
-// Estado de la pantalla (no se guarda): pestaña, mes visible y categoría desplegada
-// acc: cuenta elegida en la tarjeta de saldo (null = saldo total)
-const ui = { tab: "movs", ym: iso().slice(0, 7), open: null, acc: null };
-const TABS = { movs: "Movimientos", gastos: "Gastos", fijos: "Fijos", metas: "Metas", cuentas: "Cuentas" };
+// Estado de la pantalla (no se guarda): pestaña, mes visible y simulador
+const ui = { tab: "cartera", ym: iso().slice(0, 7), open: null, acc: null, simAmount: "", simResult: null };
+const TABS = {
+  cartera: "Cartera y Balance",
+  fijos: "Gastos Fijos",
+  movs: "Movimientos",
+  gastos: "Por Categoría",
+  metas: "Metas",
+  cuentas: "Cuentas"
+};
 
 registerQuickAction("money", () => openTxForm());
 
@@ -25,7 +38,6 @@ const shiftMonth = (ym, n) => { const [y, m] = ym.split("-").map(Number); return
 const shortDate = s => new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short" }).format(parseISO(s));
 const dayLabel = s => { const t = new Intl.DateTimeFormat("es-ES", { weekday: "long", day: "numeric", month: "short" }).format(parseISO(s)); return t.charAt(0).toUpperCase() + t.slice(1); };
 const signed = n => n > 0 ? `+${money(n)}` : money(n);
-const perMonth = r => r.every === "week" ? r.amount * 52 / 12 : r.every === "year" ? r.amount / 12 : r.amount;
 
 export function render(state) {
   const fin = state.finance;
@@ -33,51 +45,207 @@ export function render(state) {
     ${areaHeader(state, "fin")}
     <section class="card onboarding" style="--c:var(--fin)">
       ${icon.fin}
-      <h2>Empieza creando una cuenta</h2>
-      <p>Una cuenta es donde está tu dinero: el banco, el efectivo, una cuenta de ahorro… Pon el saldo que tiene hoy y a partir de ahí apunta los movimientos.</p>
+      <h2>Empieza creando tu primera cuenta</h2>
+      <p>Una cuenta es donde está tu dinero: tu banco principal, tu efectivo o una cuenta de ahorros. Pon el saldo que tienes hoy para activar tu cartera inteligente.</p>
       <button class="btn primary" type="button" data-act="new-account">Crear mi primera cuenta</button>
     </section>`;
 
   const sum = monthSummary(state, ui.ym);
+  const wallet = getWalletBudget(state, ui.ym);
   const isCurrent = ui.ym === iso().slice(0, 7);
-  if (ui.acc && !fin.accounts.some(a => a.id === ui.acc)) ui.acc = null;   // cuenta borrada
+  if (ui.acc && !fin.accounts.some(a => a.id === ui.acc)) ui.acc = null;
   const acc = ui.acc && fin.accounts.find(a => a.id === ui.acc);
-  const cardSum = acc ? monthSummary(state, ui.ym, acc.id) : sum;
   const hist = balanceHistory(state, ui.ym, 6, acc?.id);
 
   return `
     ${areaHeader(state, "fin")}
 
+    <!-- Tarjeta Resumen de Saldo y Cuentas -->
     <section class="card">
-      <h2 class="card-h"><span class="h-dot" style="--c:var(--fin)"></span>${acc ? esc(acc.name) : "Saldo total"}<span class="spacer"></span></h2>
+      <div class="month-nav">
+        <button class="icon-btn" type="button" data-act="month" data-n="-1" aria-label="Mes anterior">${icon.back}</button>
+        <b>${monthLabel(ui.ym)}</b>
+        <button class="icon-btn" type="button" data-act="month" data-n="1" aria-label="Mes siguiente"${isCurrent ? " disabled" : ""}>${icon.chevron}</button>
+      </div>
+
+      <h2 class="card-h"><span class="h-dot" style="--c:var(--fin)"></span>${acc ? esc(acc.name) : "Saldo total en cuentas"}<span class="spacer"></span></h2>
       ${fin.accounts.length > 1 ? `<div class="chips acc-chips" role="tablist" aria-label="Ver saldo de">
         <button type="button" role="tab" class="chip small" data-act="acc" data-id="" aria-selected="${!acc}">Total</button>
         ${fin.accounts.map(a => `<button type="button" role="tab" class="chip small" data-act="acc" data-id="${a.id}" aria-selected="${acc?.id === a.id}">${esc(a.name)}</button>`).join("")}
       </div>` : ""}
       <div class="money-big num">${money(acc ? accountBalance(state, acc.id) : totalBalance(state))}</div>
       <div class="money-sub">${acc ? ACCOUNT_TYPES[acc.type] || "Cuenta" : `${fin.accounts.length} cuenta${fin.accounts.length > 1 ? "s" : ""}`}</div>
-      <div class="month-nav">
-        <button class="icon-btn" type="button" data-act="month" data-n="-1" aria-label="Mes anterior">${icon.back}</button>
-        <b>${monthLabel(ui.ym)}</b>
-        <button class="icon-btn" type="button" data-act="month" data-n="1" aria-label="Mes siguiente"${isCurrent ? " disabled" : ""}>${icon.chevron}</button>
-      </div>
-      <div class="split three">
-        <div><small>Ingresos</small><b class="num pos">${signed(cardSum.income)}</b></div>
-        <div><small>Gastos</small><b class="num neg">${money(cardSum.expense)}</b></div>
-        <div><small>Balance</small><b class="num ${cardSum.net >= 0 ? "pos" : "neg"}">${signed(cardSum.net)}</b></div>
-      </div>
-      ${cardSum.transfers ? `<div class="money-sub">Transferencias del mes: <b class="num">${signed(cardSum.transfers)}</b></div>` : ""}
+
       ${areaChart(hist, { color: "#7fcf9b", format: v => money(v).replace(/,\d\d €$/, " €"), id: "bal" })}
       <div class="legend"><span style="--c:var(--fin)">${acc ? `Saldo de ${esc(acc.name)}` : "Saldo total"} a final de cada mes</span></div>
     </section>
 
+    <!-- Selector de Pestañas de Finanzas -->
     <div class="chips" role="tablist">${Object.entries(TABS).map(([k, l]) =>
       `<button type="button" role="tab" class="chip" data-act="tab" data-tab="${k}" aria-selected="${ui.tab === k}">${l}</button>`).join("")}</div>
 
-    ${({ movs: movsTab, gastos: gastosTab, fijos: fijosTab, metas: metasTab, cuentas: cuentasTab })[ui.tab](state, sum)}`;
+    <!-- Contenido de la pestaña activa -->
+    ${({
+      cartera: () => carteraTab(state, wallet, sum),
+      fijos: () => fijosTab(state, wallet),
+      movs: () => movsTab(state),
+      gastos: () => gastosTab(state, sum),
+      metas: () => metasTab(state),
+      cuentas: () => cuentasTab(state)
+    })[ui.tab]()}`;
 }
 
-// ---------- Movimientos del mes, agrupados por día
+// ---------- 1. Cartera Inteligente y Balance
+function carteraTab(state, w, sum) {
+  const isHealthy = w.remainingFree >= (w.totalIncome * 0.2);
+  const isTight = w.remainingFree >= 0 && !isHealthy;
+  const isDeficit = w.remainingFree < 0;
+
+  const statusBadge = w.totalIncome === 0
+    ? `<span class="tag" style="--c:var(--muted)">Sin ingreso mensual</span>`
+    : isDeficit
+      ? `<span class="tag" style="--c:var(--danger)">🔴 Déficit de ${money(Math.abs(w.remainingFree))}</span>`
+      : isTight
+        ? `<span class="tag" style="--c:var(--warn)">🟡 Margen ajustado</span>`
+        : `<span class="tag" style="--c:var(--ok)">🟢 Presupuesto saludable</span>`;
+
+  return `
+    <section class="card wallet-card">
+      <div class="wallet-head">
+        <div>
+          <span class="sub-label">Cartera · ${monthLabel(ui.ym)}</span>
+          <div class="money-big num ${w.remainingFree >= 0 ? "pos" : "neg"}">${signed(w.remainingFree)}</div>
+          <div class="money-sub">Dinero libre disponible (después de fijos y gastos)</div>
+        </div>
+        <div class="wallet-badge">${statusBadge}</div>
+      </div>
+
+      <div class="wallet-progress-wrap">
+        <div class="wallet-progress-bar">
+          <i style="width:${Math.max(2, w.burnPct)}%; background:${isDeficit ? "var(--danger)" : isTight ? "var(--warn)" : "var(--fin)"}"></i>
+        </div>
+        <div class="wallet-progress-labels">
+          <span><b>${w.burnPct}%</b> del presupuesto comprometido</span>
+          <span>${w.isCurrentMonth ? `Te quedan ${w.daysLeft} días (~${money(w.dailyBudget)}/día)` : "Mes cerrado"}</span>
+        </div>
+      </div>
+
+      <div class="wallet-metrics-grid">
+        <div class="metric-box">
+          <div class="mb-top">
+            <small>Ingresos del mes</small>
+            <button class="btn-link" type="button" data-act="set-income">✏️ ${w.configuredIncome > 0 ? "Modificar" : "Configurar"}</button>
+          </div>
+          <b class="num pos">+${money(w.totalIncome)}</b>
+          <span class="mb-sub">${w.configuredIncome > 0 ? "Sueldo registrado" : "Movimientos reales"}</span>
+        </div>
+
+        <div class="metric-box">
+          <div class="mb-top">
+            <small>Gastos Fijos</small>
+            <button class="btn-link" type="button" data-act="tab" data-tab="fijos">Ver ${w.fixedCount}</button>
+          </div>
+          <b class="num neg">-${money(w.fixedMonthlyTotal)}</b>
+          <span class="mb-sub">Alquiler, facturas y subs</span>
+        </div>
+
+        <div class="metric-box">
+          <div class="mb-top">
+            <small>Gastos Variables</small>
+            <button class="btn-link" type="button" data-act="tab" data-tab="movs">Ver movs</button>
+          </div>
+          <b class="num neg">-${money(w.variableSpent)}</b>
+          <span class="mb-sub">Compras de este mes</span>
+        </div>
+
+        <div class="metric-box highlight">
+          <div class="mb-top">
+            <small>Dinero Libre Restante</small>
+          </div>
+          <b class="num ${w.remainingFree >= 0 ? "pos" : "neg"}">${signed(w.remainingFree)}</b>
+          <span class="mb-sub">${w.remainingFree >= 0 ? `~${money(w.dailyBudget)} por día` : "En descubierto"}</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Asesor de Viabilidad de Gastos ("¿Puedo permitírmelo?") -->
+    <section class="card advisor-card">
+      <h2 class="card-h">
+        <span class="h-dot" style="--c:var(--cyan)"></span>Asesor de Viabilidad · ¿Puedo permitírmelo?
+      </h2>
+      <p class="hint">Escribe el importe de una compra o gasto que estés pensando hacer. El sistema comprobará al instante tu dinero libre restante tras gastos fijos y te dirá si es viable.</p>
+      
+      <div class="advisor-input-row">
+        <div class="amount-wrap advisor-amount-wrap">
+          <input class="input" id="advisor-amount-input" inputmode="decimal" autocomplete="off" placeholder="p. ej. 60" value="${ui.simAmount || ""}">
+          <span>€</span>
+        </div>
+        <button class="btn primary" type="button" id="advisor-check-btn">Comprobar</button>
+      </div>
+
+      <div id="advisor-result" class="advisor-result-box ${ui.simResult ? `is-${ui.simResult.status}` : ""}" ${ui.simResult ? "" : "hidden"}>
+        ${ui.simResult ? `
+          <div class="adv-badge">${ui.simResult.badge}</div>
+          <p class="adv-text">${esc(ui.simResult.message)}</p>
+          <div class="btn-row" style="margin-top:8px">
+            <button class="btn small primary" type="button" data-act="quick-spend" data-amount="${ui.simAmount}">+ Apuntar este gasto ahora</button>
+          </div>
+        ` : ""}
+      </div>
+    </section>
+
+    <!-- Acceso rápido a Fijos y Movimientos -->
+    <section class="card">
+      <div class="split-cards-row">
+        <div class="split-card-item">
+          <h3 class="card-sub-h">Gastos Fijos Comprometidos (${w.fixedCount})</h3>
+          <p class="hint">Alquiler, facturas y suscripciones aseguradas cada mes.</p>
+          <b class="num neg" style="font-size:18px;display:block;margin:6px 0">-${money(w.fixedMonthlyTotal)} / mes</b>
+          <div class="btn-row">
+            <button class="btn small" type="button" data-act="tab" data-tab="fijos">Gestionar fijos →</button>
+            <button class="btn small primary" type="button" data-act="new-rec">+ Añadir fijo</button>
+          </div>
+        </div>
+        <div class="split-card-item">
+          <h3 class="card-sub-h">Acciones Rápidas</h3>
+          <p class="hint">Registra un gasto o ingreso al momento.</p>
+          <div class="btn-row" style="margin-top:12px">
+            <button class="btn small primary" type="button" data-act="new-tx">${icon.plus} Nuevo gasto / ingreso</button>
+            <button class="btn small" type="button" data-act="set-income">Sueldo mensual</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+// ---------- 2. Gastos Fijos y Suscripciones
+function fijosTab(state, w) {
+  const rec = [...state.finance.recurring].sort((a, b) => (a.active === false) - (b.active === false) || (a.nextDate || "").localeCompare(b.nextDate || ""));
+  const fixedExpensesOnly = rec.filter(r => r.amount < 0);
+  const fixedTotal = Math.abs(fixedExpensesOnly.filter(r => r.active !== false).reduce((s, r) => s + perMonth(r), 0));
+
+  return `<section class="card">
+    <h2 class="card-h"><span class="h-dot" style="--c:var(--fin)"></span>Tus Gastos Fijos y Suscripciones<span class="spacer"></span><button class="btn primary small" type="button" data-act="new-rec">${icon.plus} Nuevo fijo</button></h2>
+    <p class="hint">Son tus pagos fijos comprometidos (alquiler, gimnasio, internet, streaming). Tu cartera los tiene siempre en cuenta para calcular tu dinero libre real.</p>
+    
+    <div class="split" style="margin:14px 0">
+      <div><small>Total fijos comprometidos</small><b class="num neg">-${money(fixedTotal)} / mes</b></div>
+      <div><small>Fijos activos programados</small><b class="num">${fixedExpensesOnly.filter(r => r.active !== false).length} activos</b></div>
+    </div>
+
+    ${rec.length ? `
+      <div class="list">${rec.map(r => `
+        <button class="item tap${r.active === false ? " is-off" : ""}" type="button" data-act="edit-rec" data-id="${r.id}">
+          <span class="cat-ico" style="--c:${catColor(state, r.categoryId)}"></span>
+          <span class="t">${esc(r.name)}<small>${FREQS[r.every] || "Mensual"} · ${r.active === false ? "En pausa" : `próximo ${shortDate(r.nextDate)}`}</small></span>
+          <b class="num ${r.amount > 0 ? "pos" : ""}">${signed(r.amount)}</b>
+        </button>`).join("")}</div>`
+    : `<div class="empty">Añade aquí el alquiler, tus suscripciones, el wifi… Se reservarán de tu presupuesto para que nunca te quedes corto.</div>`}
+  </section>`;
+}
+
+// ---------- 3. Movimientos del mes, agrupados por día
 function movsTab(state) {
   const fin = state.finance;
   const accName = id => fin.accounts.find(a => a.id === id)?.name || "Cuenta borrada";
@@ -110,7 +278,7 @@ function movsTab(state) {
   </section>`;
 }
 
-// ---------- Gasto del mes por categoría
+// ---------- 4. Gasto del mes por categoría
 function gastosTab(state, sum) {
   const total = -sum.expense;
   const manage = `<button class="btn small" type="button" data-act="cats">Categorías</button>`;
@@ -129,25 +297,7 @@ function gastosTab(state, sum) {
   </section>`;
 }
 
-// ---------- Fijos y suscripciones
-function fijosTab(state) {
-  const rec = [...state.finance.recurring].sort((a, b) => (a.active === false) - (b.active === false) || (a.nextDate || "").localeCompare(b.nextDate || ""));
-  const monthly = rec.filter(r => r.active !== false).reduce((s, r) => s + perMonth(r), 0);
-  return `<section class="card">
-    <div class="btn-row"><button class="btn primary" type="button" data-act="new-rec">${icon.plus} Nuevo fijo</button></div>
-    ${rec.length ? `
-      <div class="kv big"><span>Equivale al mes</span><b class="num ${monthly >= 0 ? "pos" : "neg"}">${signed(monthly)}</b></div>
-      <div class="list">${rec.map(r => `
-        <button class="item tap${r.active === false ? " is-off" : ""}" type="button" data-act="edit-rec" data-id="${r.id}">
-          <span class="cat-ico" style="--c:${catColor(state, r.categoryId)}"></span>
-          <span class="t">${esc(r.name)}<small>${FREQS[r.every] || "Mensual"} · ${r.active === false ? "En pausa" : `próximo ${shortDate(r.nextDate)}`}</small></span>
-          <b class="num ${r.amount > 0 ? "pos" : ""}">${signed(r.amount)}</b>
-        </button>`).join("")}</div>`
-    : `<div class="empty">Añade tus suscripciones, el alquiler, la nómina… Se apuntarán solos cada vez que toque.</div>`}
-  </section>`;
-}
-
-// ---------- Metas de ahorro
+// ---------- 5. Metas de ahorro
 function metasTab(state) {
   const goals = state.finance.goals;
   const add = `<div class="btn-row"><button class="btn primary" type="button" data-act="new-goal">${icon.plus} Nueva meta</button></div>`;
@@ -172,7 +322,7 @@ function metasTab(state) {
   }).join("")}</div></section>`;
 }
 
-// ---------- Cuentas
+// ---------- 6. Cuentas
 function cuentasTab(state) {
   const accs = state.finance.accounts;
   return `<section class="card">
@@ -190,29 +340,70 @@ function cuentasTab(state) {
   </section>`;
 }
 
-// ---------- Interacción
-export function mount(root, _state, signal) {
+// ---------- Interacción y Asesor
+export function mount(root, state, signal) {
   root.addEventListener("click", e => {
     const b = e.target.closest("[data-act]");
-    if (!b) return;
-    const id = b.dataset.id;
-    const rerender = () => window.dispatchEvent(new Event("pv:render"));
-    switch (b.dataset.act) {
-      case "tab": ui.tab = b.dataset.tab; ui.open = null; rerender(); break;
-      case "acc": ui.acc = id || null; rerender(); break;
-      case "month": ui.ym = shiftMonth(ui.ym, Number(b.dataset.n)); rerender(); break;
-      case "open-cat": ui.open = ui.open === id ? null : id; rerender(); break;
-      case "new-tx": openTxForm(); break;
-      case "edit-tx": openTxForm({ id }); break;
-      case "transfer": openTxForm({ type: "transfer" }); break;
-      case "new-account": openAccountForm(); break;
-      case "edit-account": openAccountForm(id); break;
-      case "new-rec": openRecurringForm(); break;
-      case "edit-rec": openRecurringForm(id); break;
-      case "new-goal": openGoalForm(); break;
-      case "edit-goal": openGoalForm(id); break;
-      case "contrib": openContribute(id); break;
-      case "cats": openCategories(); break;
+    if (b) {
+      const id = b.dataset.id;
+      const rerender = () => window.dispatchEvent(new Event("pv:render"));
+      switch (b.dataset.act) {
+        case "tab": ui.tab = b.dataset.tab; ui.open = null; rerender(); break;
+        case "acc": ui.acc = id || null; rerender(); break;
+        case "month": ui.ym = shiftMonth(ui.ym, Number(b.dataset.n)); rerender(); break;
+        case "open-cat": ui.open = ui.open === id ? null : id; rerender(); break;
+        case "set-income": openMonthlyIncomeForm(); break;
+        case "quick-spend": {
+          const amt = Number(b.dataset.amount);
+          openTxForm({ type: "expense" });
+          if (amt > 0) {
+            setTimeout(() => {
+              const input = document.getElementById("tx-amount");
+              if (input) {
+                input.value = String(amt).replace(".", ",");
+                input.dispatchEvent(new Event("input", { bubbles: true }));
+              }
+            }, 300);
+          }
+          break;
+        }
+        case "new-tx": openTxForm(); break;
+        case "edit-tx": openTxForm({ id }); break;
+        case "transfer": openTxForm({ type: "transfer" }); break;
+        case "new-account": openAccountForm(); break;
+        case "edit-account": openAccountForm(id); break;
+        case "new-rec": openRecurringForm(); break;
+        case "edit-rec": openRecurringForm(id); break;
+        case "new-goal": openGoalForm(); break;
+        case "edit-goal": openGoalForm(id); break;
+        case "contrib": openContribute(id); break;
+        case "cats": openCategories(); break;
+      }
+    }
+
+    // Botón de asesor
+    if (e.target.closest("#advisor-check-btn")) {
+      runAdvisorSimulation();
     }
   }, { signal });
+
+  const advInput = root.querySelector("#advisor-amount-input");
+  if (advInput) {
+    advInput.addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        runAdvisorSimulation();
+      }
+    });
+  }
+
+  function runAdvisorSimulation() {
+    const input = root.querySelector("#advisor-amount-input");
+    if (!input) return;
+    const val = parseAmount(input.value);
+    if (!val || val <= 0) return;
+    ui.simAmount = String(val);
+    ui.simResult = checkExpenseViability(state, val, ui.ym);
+    window.dispatchEvent(new Event("pv:render"));
+  }
 }

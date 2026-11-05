@@ -3,7 +3,7 @@
 // movimientos (salida y entrada) con el mismo transferId y sin categoría.
 
 import { iso, parseISO, addDays } from "./stats.js";
-import { uid } from "./ui.js";
+import { uid, money } from "./ui.js";
 
 // ---------- Categorías por defecto (con subcategorías)
 const PALETTE = {
@@ -147,3 +147,118 @@ export function parseAmount(str) {
   return Number.isFinite(n) ? Math.round(n * 100) / 100 : NaN;
 }
 export const amountInput = n => n ? String(Math.abs(n).toFixed(2)).replace(".", ",").replace(/,00$/, "") : "";
+
+// ---------- Cartera Inteligente, Gastos Fijos y Viabilidad
+export const perMonth = r => r.every === "week" ? r.amount * 52 / 12 : r.every === "year" ? r.amount / 12 : r.amount;
+
+export function getWalletBudget(state, ym = iso().slice(0, 7)) {
+  const fin = state.finance;
+  const configuredIncome = Number(fin.monthlyIncome) || 0;
+  const sum = monthSummary(state, ym);
+  const actualIncome = sum.income || 0;
+  const totalIncome = configuredIncome > 0 ? configuredIncome : actualIncome;
+
+  // Gastos fijos comprometidos (mensuales)
+  const fixedList = (fin.recurring || []).filter(r => r.active !== false && r.amount < 0);
+  const fixedMonthlyTotal = Math.abs(fixedList.reduce((acc, r) => acc + perMonth(r), 0));
+
+  // Gastos variables apuntados en el mes (excluyendo auto/recurring y transferencias)
+  const variableSpent = Math.abs(fin.transactions
+    .filter(t => t.date.startsWith(ym) && t.amount < 0 && !t.auto && !t.transferId)
+    .reduce((acc, t) => acc + t.amount, 0));
+
+  // Dinero disponible neto tras fijos
+  const disposable = Math.max(0, totalIncome - fixedMonthlyTotal);
+  // Dinero libre restante real
+  const remainingFree = totalIncome - fixedMonthlyTotal - variableSpent;
+
+  // Días del mes y días restantes
+  const [y, m] = ym.split("-").map(Number);
+  const totalDays = new Date(y, m, 0).getDate();
+  const today = new Date();
+  const isCurrentMonth = ym === iso().slice(0, 7);
+  const currentDay = isCurrentMonth ? today.getDate() : totalDays;
+  const daysLeft = isCurrentMonth ? Math.max(1, totalDays - currentDay + 1) : 1;
+  const dailyBudget = remainingFree > 0 ? (remainingFree / daysLeft) : 0;
+
+  // Porcentaje de presupuesto consumido
+  const totalEstimatedExpense = fixedMonthlyTotal + variableSpent;
+  const burnPct = totalIncome > 0 ? Math.min(100, Math.round((totalEstimatedExpense / totalIncome) * 100)) : 0;
+
+  return {
+    ym,
+    configuredIncome,
+    actualIncome,
+    totalIncome,
+    fixedMonthlyTotal,
+    fixedCount: fixedList.length,
+    fixedList,
+    variableSpent,
+    disposable,
+    remainingFree,
+    totalEstimatedExpense,
+    burnPct,
+    totalDays,
+    daysLeft,
+    dailyBudget,
+    isCurrentMonth
+  };
+}
+
+export function checkExpenseViability(state, candidateAmount, ym = iso().slice(0, 7)) {
+  const amt = Number(candidateAmount);
+  if (!amt || isNaN(amt) || amt <= 0) return null;
+
+  const w = getWalletBudget(state, ym);
+  if (!w.totalIncome && !totalBalance(state)) {
+    return {
+      status: "unknown",
+      badge: "Sin presupuesto configurado",
+      color: "var(--muted)",
+      message: "Configura tu ingreso mensual en Finanzas para evaluar la viabilidad de gastos.",
+      remainingAfter: null,
+      dailyAfter: null,
+      wallet: w
+    };
+  }
+
+  const basePool = w.totalIncome > 0 ? w.remainingFree : totalBalance(state);
+  const remainingAfter = basePool - amt;
+  const dailyAfter = remainingAfter > 0 ? (remainingAfter / w.daysLeft) : 0;
+
+  if (remainingAfter < 0) {
+    const deficit = Math.abs(remainingAfter);
+    return {
+      status: "danger",
+      badge: "🔴 No viable / Riesgo alto",
+      color: "var(--danger)",
+      message: `Este gasto supera tu dinero libre en ${money(deficit)} y comprometería tus gastos fijos o tus ahorros.`,
+      remainingAfter,
+      dailyAfter: 0,
+      wallet: w
+    };
+  }
+
+  // Si tras el gasto queda menos del 15% del disponible o consume más del 65% de lo que quedaba
+  if ((w.disposable > 0 && remainingAfter < w.disposable * 0.15) || (basePool > 0 && amt > basePool * 0.65)) {
+    return {
+      status: "warn",
+      badge: "🟡 Viable pero ajustado",
+      color: "var(--warn)",
+      message: `Gasto ajustado: consumirá gran parte de tu disponible. Te quedarán ${money(remainingAfter)} para ${w.daysLeft} días (~${money(dailyAfter)}/día).`,
+      remainingAfter,
+      dailyAfter,
+      wallet: w
+    };
+  }
+
+  return {
+    status: "ok",
+    badge: "🟢 Gasto totalmente viable",
+    color: "var(--ok)",
+    message: `¡Es viable! Tras este gasto te quedarán ${money(remainingAfter)} libres este mes (~${money(dailyAfter)}/día).`,
+    remainingAfter,
+    dailyAfter,
+    wallet: w
+  };
+}

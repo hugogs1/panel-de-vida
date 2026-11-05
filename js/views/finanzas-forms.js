@@ -4,7 +4,7 @@ import { getState, update } from "../state.js";
 import { openSheet, closeSheet, toast, confirmSheet, esc, uid, money } from "../ui.js";
 import { iso } from "../stats.js";
 import { seg, field } from "../forms.js";
-import { ACCOUNT_TYPES, FREQS, parseAmount, amountInput, applyRecurring, accountBalance, catById } from "../finance.js";
+import { ACCOUNT_TYPES, FREQS, parseAmount, amountInput, applyRecurring, accountBalance, catById, checkExpenseViability } from "../finance.js";
 
 // ---------- Piezas comunes
 function categoryOptions(state, kind, selected) {
@@ -50,6 +50,7 @@ export function openTxForm({ id = null, type = "expense" } = {}) {
       <div class="field amount-field">
         <label for="tx-amount">Importe</label>
         <div class="amount-wrap"><input class="input amount" id="tx-amount" inputmode="decimal" autocomplete="off" placeholder="0,00" value="${amountInput(amount)}"><span>€</span></div>
+        <div id="tx-viability" class="tx-viability" hidden></div>
       </div>
       <div class="row2">
         ${field("Fecha", "tx-date", `<input class="input" type="date" id="tx-date" value="${tx?.date || iso()}" required>`)}
@@ -67,12 +68,37 @@ export function openTxForm({ id = null, type = "expense" } = {}) {
     </form>`);
 
   const form = sheet.querySelector("#tx-form");
+  const viabEl = sheet.querySelector("#tx-viability");
+
+  const updateViability = () => {
+    const t = form.dataset.type;
+    if (t !== "expense") {
+      viabEl.hidden = true;
+      return;
+    }
+    const val = parseAmount(form.querySelector("#tx-amount").value);
+    if (!val || val <= 0) {
+      viabEl.hidden = true;
+      return;
+    }
+    const res = checkExpenseViability(getState(), val);
+    if (!res) {
+      viabEl.hidden = true;
+      return;
+    }
+    viabEl.hidden = false;
+    viabEl.className = `tx-viability is-${res.status}`;
+    viabEl.innerHTML = `<span class="viab-badge">${res.badge}</span><span class="viab-msg">${res.message}</span>`;
+  };
+
   const sync = () => {
     const t = form.querySelector("[name=type]:checked").value;
     form.dataset.type = t;
     sheet.querySelectorAll("[data-show]").forEach(el => { el.hidden = !el.dataset.show.split(" ").includes(t); });
+    updateViability();
   };
   form.addEventListener("change", e => { if (e.target.name === "type") sync(); });
+  form.querySelector("#tx-amount").addEventListener("input", updateViability);
   sync();
   if (!id) setTimeout(() => form.querySelector("#tx-amount").focus(), 250);
 
@@ -376,4 +402,37 @@ export function openCategories(kind = "expense") {
         rerender();
       }
   }
+}
+
+// ---------- Ingreso mensual base / Sueldo
+export function openMonthlyIncomeForm() {
+  const s = getState();
+  const current = Number(s.finance.monthlyIncome) || 0;
+  const sheet = openSheet(`
+    <h2>Ingreso mensual del mes</h2>
+    <p class="hint">Indica tu sueldo o ingresos habituales de este mes. Tu cartera usará esta cifra para calcular automáticamente tus gastos fijos comprometidos, tu dinero libre y si tus nuevos gastos son viables.</p>
+    <form class="form" id="income-form" novalidate>
+      <div class="field amount-field">
+        <label for="monthly-income-input">Ingreso previsto del mes</label>
+        <div class="amount-wrap"><input class="input amount" id="monthly-income-input" inputmode="decimal" autocomplete="off" placeholder="0,00" value="${amountInput(current)}"><span>€</span></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" type="button" data-close>Cancelar</button>
+        <button class="btn primary" type="submit">Guardar ingreso</button>
+      </div>
+    </form>`);
+
+  const form = sheet.querySelector("#income-form");
+  setTimeout(() => form.querySelector("#monthly-income-input").focus(), 250);
+
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    const val = parseAmount(form.querySelector("#monthly-income-input").value);
+    if (isNaN(val) || val < 0) { toast("Escribe una cifra válida", { error: true }); return; }
+    update(st => {
+      st.finance.monthlyIncome = val;
+    });
+    closeSheet();
+    toast(val > 0 ? `Ingreso mensual fijado en ${money(val)}` : "Ingreso mensual desactivado");
+  });
 }

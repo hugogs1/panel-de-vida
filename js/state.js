@@ -19,6 +19,7 @@ export function defaultState() {
       lastBackupAt: null
     },
     finance: {
+      monthlyIncome: 0,      // Ingreso mensual previsto/registrado para balance y cartera
       accounts: [],          // { id, name, type, initial, color }
       categories: [],        // { id, name, kind: "expense"|"income", parentId, icon }
       transactions: [],      // { id, date, amount, accountId, categoryId, note, transferId }

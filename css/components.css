@@ -157,8 +157,8 @@
   font-size: 10px; font-weight: 500; text-decoration: none; color: var(--dim);
   transition: color .2s;
 }
+.tab[data-area="resumen"] { --c: var(--cyan); }
 .tab[data-area="fin"] { --c: var(--fin); }
-.tab[data-area="work"] { --c: var(--work); }
 .tab[data-area="hab"] { --c: var(--hab); }
 .tab[data-area="ag"] { --c: var(--agenda); }
 .tab svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
@@ -737,3 +737,147 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
 .card.weekly { border-color: rgba(124, 196, 228, .3); }
 @media (min-width: 1024px) { .wk-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .legend .no-dot::before { display: none; }
+
+/* =========================================================
+   Estilo Bento Agenda & Cartera Inteligente
+   ========================================================= */
+
+/* Barra Bento de acceso rápido en Agenda */
+.bento-nav {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;
+  margin-top: 4px;
+}
+.bento-pill {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; border-radius: var(--r);
+  background: var(--surface); border: 1px solid var(--line);
+  text-decoration: none; color: var(--fg);
+  transition: border-color .15s, background .15s, transform .15s;
+}
+.bento-pill:active { transform: scale(.98); }
+.bento-pill .bp-icon {
+  width: 28px; height: 28px; border-radius: 8px; flex: none;
+  display: grid; place-items: center;
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+  color: var(--c);
+}
+.bento-pill .bp-icon svg { width: 16px; height: 16px; }
+.bento-pill .bp-t { display: grid; min-width: 0; }
+.bento-pill .bp-t b { font-size: 13px; font-weight: 600; line-height: 1.2; }
+.bento-pill .bp-t small { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Tarjetas Bento */
+.bento-card {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.card-footer-link {
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line-soft);
+  display: flex; justify-content: flex-end;
+}
+.card-sub-h {
+  margin: 0; font-size: 14px; font-weight: 600; color: var(--fg);
+}
+
+/* Pulso de Salud: Pasos y Sueño */
+.health-step-card {
+  padding: 12px 14px; border-radius: 10px;
+  background: var(--surface-2); border: 1px solid var(--line-soft);
+  display: grid; gap: 6px;
+}
+.hsc-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 600; }
+.hsc-bar { height: 6px; border-radius: 99px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.hsc-bar > i { display: block; height: 100%; border-radius: inherit; background: var(--hab); transition: width .4s ease-out; }
+.hsc-sub { font-size: 11px; color: var(--muted); }
+.health-mini-metric {
+  padding: 8px 12px; border-radius: 8px; font-size: 12px; color: var(--muted);
+  background: var(--surface-2); border: 1px solid var(--line-soft);
+}
+
+/* Cartera Inteligente y Balance */
+.wallet-card { display: grid; gap: 14px; }
+.wallet-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.sub-label { font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.wallet-badge { flex: none; }
+.wallet-progress-wrap { display: grid; gap: 6px; }
+.wallet-progress-bar { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.wallet-progress-bar > i { display: block; height: 100%; border-radius: inherit; transition: width .4s ease-out; }
+.wallet-progress-labels { display: flex; justify-content: space-between; font-size: var(--fs-xs); color: var(--muted); }
+
+.wallet-metrics-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;
+}
+.metric-box {
+  padding: 12px; border-radius: 10px;
+  background: var(--surface-2); border: 1px solid var(--line-soft);
+  display: grid; gap: 4px;
+}
+.metric-box.highlight {
+  background: color-mix(in srgb, var(--surface-2) 80%, var(--night));
+  border-color: rgba(127, 207, 155, .25);
+}
+.mb-top { display: flex; justify-content: space-between; align-items: baseline; }
+.mb-top small { font-size: 11px; color: var(--muted); font-weight: 500; }
+.metric-box b { font-size: 17px; font-weight: 700; }
+.mb-sub { font-size: 10px; color: var(--muted); }
+.btn-link {
+  background: none; border: 0; padding: 0; color: var(--cyan);
+  font-size: 11px; font-weight: 500; cursor: pointer; text-decoration: underline;
+}
+
+/* Asesor de Viabilidad de Gastos */
+.advisor-card { display: grid; gap: 12px; }
+.advisor-input-row { display: flex; gap: 10px; align-items: stretch; }
+.advisor-amount-wrap { flex: 1; min-width: 0; }
+.advisor-result-box {
+  padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line);
+  display: grid; gap: 6px; font-size: 13px;
+  animation: fade .2s ease-out;
+}
+.advisor-result-box.is-ok {
+  background: color-mix(in srgb, var(--ok) 10%, transparent);
+  border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+}
+.advisor-result-box.is-warn {
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+}
+.advisor-result-box.is-danger {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+}
+.adv-badge { font-weight: 700; font-size: 13px; }
+.adv-text { margin: 0; color: var(--fg); line-height: 1.45; font-size: 12px; }
+
+/* Viabilidad en formulario de nuevo gasto */
+.tx-viability {
+  margin-top: 8px; padding: 10px 12px; border-radius: 8px;
+  display: grid; gap: 4px; font-size: 12px; line-height: 1.4;
+  animation: fade .2s ease-out;
+}
+.tx-viability.is-ok {
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ok) 35%, transparent);
+}
+.tx-viability.is-warn {
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+}
+.tx-viability.is-danger {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+}
+.tx-viability .viab-badge { font-weight: 700; }
+.tx-viability .viab-msg { color: var(--fg); }
+
+/* Fila dividida en tarjetas */
+.split-cards-row {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;
+}
+.split-card-item {
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line-soft);
+}
+@media (max-width: 600px) {
+  .split-cards-row { grid-template-columns: 1fr; }
+}
+

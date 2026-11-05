@@ -6,9 +6,6 @@
 
 .sidebar, .desk-greeting { display: none; }
 .cols, .col { display: contents; }
-/* orden en el móvil: XP, Hoy, Hábitos, Dinero, Semana */
-.view[data-route="resumen"] .col-3 > * { order: 1; }
-.view[data-route="resumen"] .col-2 > :last-child { order: 2; }
 
 kbd {
   font: 600 10px var(--sans); color: var(--muted);
