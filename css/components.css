@@ -31,7 +31,11 @@
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r);
-  padding: 16px;
+  padding: 18px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-card);
+  transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
 }
 .card-h {
   margin: 0;
@@ -104,13 +108,23 @@
 /* ---------- Botones y campos ---------- */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  min-height: 44px; padding: 0 16px; border-radius: var(--r);
-  border: 1px solid var(--line); background: var(--surface-2); color: var(--fg);
+  min-height: 44px; padding: 0 18px; border-radius: var(--r-pill);
+  border: 1px solid var(--line); background: rgba(255, 255, 255, 0.05); color: var(--fg);
   font-weight: 600; font-size: var(--fs-md); cursor: pointer; text-decoration: none;
+  transition: all .18s cubic-bezier(.2,.8,.2,1);
+}
+.btn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 .btn.primary {
-  border: 0; color: var(--night);
-  background: var(--fg);
+  border: 0; color: #fff;
+  background: linear-gradient(135deg, var(--c, var(--cyan)), color-mix(in srgb, var(--c, var(--cyan)) 80%, black));
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--c, var(--cyan)) 35%, transparent);
+}
+.btn.primary:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--c, var(--cyan)) 45%, transparent);
 }
 .btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
 .btn.small { min-height: 34px; padding: 0 12px; font-size: 13px; }
@@ -149,8 +163,9 @@
   height: calc(var(--tabbar-h) + var(--safe-bottom));
   padding: 0 max(8px, env(safe-area-inset-right, 0px)) var(--safe-bottom) max(8px, env(safe-area-inset-left, 0px));
   display: grid; grid-template-columns: repeat(5, 1fr); align-items: center;
-  background: rgba(14, 15, 17, .94); border-top: 1px solid var(--line);
-  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  background: rgba(12, 14, 18, 0.88); border-top: 1px solid rgba(255, 255, 255, 0.08);
+  -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
 }
 .tab {
   position: relative; display: grid; justify-items: center; gap: 3px; padding: 6px 0;
@@ -166,10 +181,16 @@
 .tab[aria-current="page"]::after { content: ""; position: absolute; top: 2px; right: calc(50% - 16px); width: 5px; height: 5px; border-radius: 50%; background: var(--c); }
 
 .plus {
-  justify-self: center; width: 46px; height: 46px;
+  justify-self: center; width: 48px; height: 48px;
   display: grid; place-items: center; cursor: pointer;
-  border: 0; border-radius: 50%; color: var(--night); background: var(--fg);
-  transition: transform .15s;
+  border: 0; border-radius: 50%; color: #fff;
+  background: linear-gradient(135deg, #0A84FF, #0060DF);
+  box-shadow: 0 4px 18px rgba(10, 132, 255, 0.45);
+  transition: transform .15s cubic-bezier(.2,.8,.2,1), box-shadow .15s ease;
+}
+.plus:hover {
+  box-shadow: 0 6px 22px rgba(10, 132, 255, 0.65);
+  transform: translateY(-1px);
 }
 .plus svg { width: 22px; height: 22px; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; fill: none; }
 .plus:active { transform: scale(.94); }
@@ -881,3 +902,595 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   .split-cards-row { grid-template-columns: 1fr; }
 }
 
+
+
+/* =========================================================
+   Apple Fitness Dials & Activity Rings
+   ========================================================= */
+.fitness-bento {
+  overflow: hidden;
+}
+.fitness-quick-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pill-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--muted);
+  border-radius: 9999px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.pill-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--fg);
+}
+.pill-btn.active {
+  background: #FA114F;
+  border-color: #FA114F;
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(250, 17, 79, 0.4);
+}
+
+.fitness-days-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 8px 2px 14px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.fitness-days-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.fit-day-chip {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 10px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  min-width: 54px;
+  transition: all 0.2s cubic-bezier(.2,.8,.2,1);
+  color: inherit;
+}
+.fit-day-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.fit-day-chip.selected {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+}
+.fit-d-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.fit-day-chip.selected .fit-d-name {
+  color: #fff;
+}
+.fit-mini-ring {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+}
+.fit-d-num {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.fitness-dials-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 6px;
+}
+@media (max-width: 440px) {
+  .fitness-dials-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+}
+
+.fitness-dial-card {
+  background: rgba(25, 28, 36, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 18px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.fitness-dial-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--fd-c, rgba(255,255,255,0.2)), transparent);
+}
+.fitness-dial-card.steps-card { --fd-c: #FA114F; }
+.fitness-dial-card.gym-card { --fd-c: #A1F524; }
+
+.fdc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.fdc-badge {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--c);
+}
+.fdc-target {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.fdc-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.fitness-dial {
+  position: relative;
+  width: 114px;
+  height: 114px;
+  display: grid;
+  place-items: center;
+}
+.fd-svg {
+  filter: drop-shadow(0 4px 12px var(--fd-glow));
+}
+.fd-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.fd-pct {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+  letter-spacing: -.02em;
+}
+.fd-label {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 3px;
+  font-weight: 700;
+  text-align: center;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fdc-stats {
+  display: flex;
+  justify-content: space-around;
+  width: 100%;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 10px;
+}
+.fdc-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+.fdc-stat small {
+  font-size: 9px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  font-weight: 600;
+}
+.fdc-stat b {
+  font-size: 13px;
+  color: var(--fg);
+  margin-top: 2px;
+}
+.truncate {
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fitness-viewing-alert {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(250, 17, 79, 0.1);
+  border: 1px solid rgba(250, 17, 79, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #fff;
+}
+.fitness-viewing-alert b {
+  color: #FA114F;
+}
+
+/* =========================================================
+   Apple Calendar Experience & Timeline
+   ========================================================= */
+.apple-cal-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cal-nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cal-title-box {
+  display: flex;
+  flex-direction: column;
+}
+.cal-month-title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  color: var(--fg);
+  line-height: 1.1;
+}
+.cal-nav-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ios-nav-arrow {
+  width: 32px;
+  height: 32px;
+}
+.ios-pill-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--fg);
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.ios-pill-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.ios-pill-btn.primary {
+  background: var(--agenda-apple);
+  border-color: var(--agenda-apple);
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(255, 59, 48, 0.45);
+}
+
+.ios-segmented-control {
+  display: flex;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 3px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.ios-seg-tab {
+  flex: 1;
+  padding: 7px 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: all .18s cubic-bezier(.2,.8,.2,1);
+}
+.ios-seg-tab.active {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+/* Tira de 7 días estilo iPhone */
+.ios-week-strip {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+}
+.ios-day-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 0;
+  border-radius: 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all .15s ease;
+  color: inherit;
+}
+.ios-day-cell:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.ios-day-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.ios-day-bubble {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--fg);
+  transition: all .18s ease;
+}
+.ios-day-cell.is-selected .ios-day-bubble {
+  background: var(--agenda-apple);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(255, 59, 48, 0.45);
+}
+.ios-day-cell.is-today:not(.is-selected) .ios-day-bubble {
+  color: var(--agenda-apple);
+  font-weight: 800;
+}
+.ios-dots {
+  display: flex;
+  gap: 3px;
+  height: 5px;
+  align-items: center;
+}
+.ios-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.ios-dot.ev { background: var(--cyan); }
+.ios-dot.tk { background: var(--agenda); }
+.ios-dot.late { background: var(--danger); }
+
+/* Timeline estilo Apple Calendar */
+.apple-timeline-card {
+  overflow: visible;
+}
+.ios-allday-box {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ios-allday-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.ios-allday-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ios-allday-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(255, 59, 48, 0.14);
+  border: 1px solid rgba(255, 59, 48, 0.25);
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+}
+.ios-ad-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.ios-allday-task {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.ios-allday-task .task-title {
+  background: none;
+  border: none;
+  color: var(--fg);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+.ios-allday-task.is-done .task-title {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.ios-timeline {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  margin-top: 14px;
+  padding-bottom: 12px;
+}
+.timeline-now-line {
+  position: absolute;
+  left: 45px;
+  right: 0;
+  z-index: 10;
+  height: 2px;
+  background: var(--agenda-apple);
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+.timeline-now-line::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--agenda-apple);
+  position: absolute;
+  left: -4px;
+  box-shadow: 0 0 10px rgba(255, 59, 48, 0.9);
+}
+.now-badge {
+  position: absolute;
+  left: -44px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--agenda-apple);
+  background: var(--night);
+  padding: 1px 3px;
+  border-radius: 4px;
+}
+.timeline-slot {
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  min-height: 52px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  position: relative;
+}
+.timeline-time {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dim);
+  padding-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.timeline-content {
+  padding: 4px 0 4px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 48px;
+}
+
+.ios-timeline-event {
+  display: flex;
+  gap: 8px;
+  background: rgba(10, 132, 255, 0.12);
+  border: 1px solid rgba(10, 132, 255, 0.22);
+  border-radius: 10px;
+  padding: 8px 12px;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.ios-timeline-event:hover {
+  background: rgba(10, 132, 255, 0.2);
+  transform: translateX(2px);
+}
+.ite-bar {
+  width: 4px;
+  border-radius: 4px;
+  flex: none;
+}
+.ite-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ite-info b {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+}
+.ite-info small {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.ios-timeline-task {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(255, 159, 10, 0.08);
+  border: 1px solid rgba(255, 159, 10, 0.2);
+  border-radius: 8px;
+}
+.ios-timeline-task .task-title {
+  background: none;
+  border: none;
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  color: var(--fg);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+.ios-timeline-task.is-done .task-title span {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.timeline-quick-add {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  width: 24px;
+  height: 20px;
+  color: var(--dim);
+  font-size: 14px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: all .15s ease;
+}
+.timeline-slot:hover .timeline-quick-add {
+  opacity: 1;
+}
+.timeline-quick-add:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}

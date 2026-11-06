@@ -84,6 +84,7 @@ export function buildDemo(alias) {
 
   // ---- Hábitos (últimas 17 semanas; hoy a medias)
   s.habits.habits = [
+    { id: "hb-pasos-salud", name: "Pasos", unit: "pasos", target: 10000, step: 1000, frequency: { type: "daily" }, source: "salud", createdAt: d(-120) },
     { id: "hb-agua", name: "Beber agua", unit: "L", target: 2, step: 0.5, frequency: { type: "daily" }, createdAt: d(-120) },
     { id: "hb-leer", name: "Leer", unit: "págs.", target: 20, step: 5, frequency: { type: "daily" }, createdAt: d(-120) },
     { id: "hb-gym", name: "Gimnasio", unit: "sesión", target: 1, step: 1, auto: "gym", frequency: { type: "weekly", times: 4 }, createdAt: d(-120) },
@@ -95,6 +96,11 @@ export function buildDemo(alias) {
     s.habits.logs.push({ id: nid("l"), habitId: "hb-agua", date: day, value: r() < good ? 2 : r() < .5 ? 1.5 : 1 });
     if (r() < good - .1) s.habits.logs.push({ id: nid("l"), habitId: "hb-leer", date: day, value: 20 + Math.round(r() * 10) });
     if ([1, 3, 5].includes(wd) && r() < good) s.habits.logs.push({ id: nid("l"), habitId: "hb-medit", date: day, value: 10 });
+  }
+  for (let i = 14; i >= 0; i--) {
+    const day = d(-i);
+    const steps = i === 0 ? 8420 : (i === 1 ? 10650 : Math.round(7200 + r() * 4500));
+    s.habits.logs.push({ id: nid("l"), habitId: "hb-pasos-salud", date: day, value: steps });
   }
   s.habits.logs.push({ id: nid("l"), habitId: "hb-agua", date: today, value: 1.5 });
   s.habits.logs.push({ id: nid("l"), habitId: "hb-leer", date: today, value: 10 });

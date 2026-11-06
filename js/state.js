@@ -93,6 +93,21 @@ export function ensureAutoHabits(s) {
       });
     }
   }
+
+  const hasStepHabit = s.habits.habits.some(h => !h.archived && (h.id === "hb-pasos-salud" || /paso/i.test(h.name || "")));
+  if (!hasStepHabit) {
+    s.habits.habits.push({
+      id: "hb-pasos-salud",
+      name: "Pasos",
+      unit: "pasos",
+      target: 10000,
+      step: 1000,
+      frequency: { type: "daily" },
+      source: "salud",
+      archived: false,
+      createdAt: new Date().toISOString().slice(0, 10)
+    });
+  }
   return s;
 }
 

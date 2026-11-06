@@ -5,12 +5,18 @@
 html, body {
   margin: 0;
   height: 100%;
-  background: var(--night);
+  background-color: var(--night);
+  background-image: 
+    radial-gradient(circle at 12% 10%, rgba(20, 35, 60, 0.35), transparent 45%),
+    radial-gradient(circle at 88% 20%, rgba(45, 18, 35, 0.28), transparent 45%),
+    radial-gradient(circle at 50% 85%, rgba(18, 38, 28, 0.25), transparent 50%);
+  background-attachment: fixed;
   color: var(--fg);
   font-family: var(--sans);
   font-size: var(--fs-md);
-  line-height: 1.4;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
 }
@@ -19,13 +25,10 @@ body {
   overscroll-behavior-y: none;
 }
 
-/* Fondo grafito liso */
-body::before { content: none; }
-
 button, input, select, textarea { font: inherit; color: inherit; }
 /* 16px en campos evita que iOS haga zoom al tocarlos */
 input, select, textarea { font-size: 16px; }
-a { color: var(--cyan); }
+a { color: var(--cyan); text-decoration: none; }
 
 :focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 
@@ -40,9 +43,9 @@ a { color: var(--cyan); }
   gap: var(--gap);
   align-content: start;
   padding:
-    calc(var(--safe-top) + 30px)
+    calc(var(--safe-top) + 24px)
     max(16px, env(safe-area-inset-right, 0px))
-    calc(var(--tabbar-h) + var(--safe-bottom) + 34px)
+    calc(var(--tabbar-h) + var(--safe-bottom) + 36px)
     max(16px, env(safe-area-inset-left, 0px));
   outline: none;
 }
@@ -50,7 +53,10 @@ a { color: var(--cyan); }
 /* Lo marcado como oculto no se ve nunca, aunque su componente defina display */
 [hidden] { display: none !important; }
 
-.num { font-variant-numeric: tabular-nums; }
+.num { 
+  font-variant-numeric: tabular-nums; 
+  letter-spacing: -0.01em;
+}
 .muted { color: var(--muted); }
 .sr-only {
   position: absolute; width: 1px; height: 1px; overflow: hidden;

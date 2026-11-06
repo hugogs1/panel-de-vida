@@ -5,16 +5,18 @@ import { esc, int, money as eur, longDate, monthName, toast } from "../ui.js";
 import { icon } from "../icons.js";
 import { backupDue } from "../backup.js";
 import { update } from "../state.js";
-import { todayItems, streak, iso, parseISO } from "../stats.js";
+import { todayItems, streak, iso, parseISO, addDays } from "../stats.js";
 import { habitsToday, habitValue, setHabitValue, AUTO_LABEL } from "../habits.js";
 import { toggleTask } from "../agenda.js";
-import { ring } from "../charts.js";
+import { ring, fitnessDial, fitnessActivityRings } from "../charts.js";
 import { getWalletBudget } from "../finance.js";
 import { weeklyBanner, closeWeekly } from "./semana.js";
 
 const PRI = { alta: ["Alta", "var(--danger)"], media: ["Media", "var(--agenda)"], baja: ["Baja", "var(--muted)"] };
 const num1 = n => new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 }).format(n);
 const signed = n => n > 0 ? `+${eur(n)}` : eur(n);
+
+const fitUI = { selectedDate: null };
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -67,7 +69,7 @@ export function render(state) {
         ${todayCard(state)}
       </div>
 
-      <!-- Columna 2: Salud, Hábitos y Deporte -->
+      <!-- Columna 2: Salud, Diales de Fitness (Pasos y Gym) y Hábitos -->
       <div class="col col-2">
         ${healthCard(state)}
       </div>
@@ -98,117 +100,207 @@ function banners(state) {
 // ---------- 1. Tarjeta de Agenda del Día
 function todayCard(state) {
   const { pending, done, total } = todayItems(state);
+  const events = state.agenda.events.filter(e => e.date === iso()).sort((a, b) => (a.allDay ? "00" : a.start.slice(11)).localeCompare(b.allDay ? "00" : b.start.slice(11)));
+
   const header = `
     <h2 class="card-h">
-      <span class="h-dot" style="--c:var(--agenda)"></span>Agenda de Hoy · ${longDate()}
+      <span class="h-dot" style="--c:var(--agenda)"></span>Agenda · Hoy
       <span class="spacer"></span>
       ${total ? `<span class="count num">${done.length}/${total}</span>` : ""}
-      <a href="#agenda">Ver todo →</a>
+      <a href="#agenda">Abrir agenda →</a>
     </h2>`;
 
-  if (!total) {
-    return `
-      <section class="card bento-card">
-        ${header}
-        <div class="empty">
-          No tienes tareas ni eventos para hoy.<br>Pulsa el botón <b>+</b> para apuntar algo rápido.
-        </div>
-        <div class="card-footer-link">
-          <a class="btn small" href="#agenda">Abrir calendario y tareas</a>
-        </div>
-      </section>`;
-  }
-
-  const row = it => {
-    if (it.kind === "event") return `
-      <div class="item">
-        <span class="tick event">${icon.clock}</span>
-        <div class="t">${esc(it.title)}<small>Evento${it.place ? ` · ${esc(it.place)}` : ""}</small></div>
-        <span class="tag num" style="--c:var(--agenda)">${it.time}</span>
-      </div>`;
-    const [pl, pc] = PRI[it.priority] || PRI.media;
-    return `
-      <button class="item tap${it.done ? " is-done" : ""}" type="button" data-task="${it.id}" aria-pressed="${!!it.done}">
-        <span class="tick" style="--c:${pc}">${icon.check}</span>
-        <span class="t">${esc(it.title)}<small>${it.overdue ? `<span style="color:var(--danger)">Atrasada</span>` : "Tarea"}${it.time ? ` · antes de las ${it.time}` : ""}</small></span>
-        ${it.done ? "" : `<span class="tag" style="--c:${pc}">${pl}</span>`}
-      </button>`;
-  };
-
   return `
-    <section class="card bento-card">
+    <section class="card bento-card today-agenda-card">
       ${header}
-      <div class="list">${pending.map(row).join("")}${done.map(row).join("")}</div>
+
+      <!-- Eventos de hoy -->
+      ${events.length ? `
+        <div class="today-events-box">
+          <span class="sub-label">Eventos programados hoy</span>
+          <div class="list tight">${events.map(e => `
+            <a class="item tap today-ev-item" href="#agenda">
+              <span class="ev-time num">${e.allDay ? "Todo el día" : e.start.slice(11, 16)}</span>
+              <span class="t"><b>${esc(e.title)}</b>${e.place ? `<small>📍 ${esc(e.place)}</small>` : ""}</span>
+            </a>`).join("")}
+          </div>
+        </div>
+      ` : ""}
+
+      <!-- Tareas pendientes de hoy -->
+      <div class="today-tasks-box">
+        <span class="sub-label">${pending.length ? "Tareas para hoy" : "Sin tareas pendientes para hoy"}</span>
+        ${pending.length ? `
+          <div class="list tight">${pending.slice(0, 6).map(t => `
+            <div class="item task">
+              <button class="tick-btn" type="button" data-task="${t.id}" aria-label="Completar ${esc(t.title)}"><span class="tick" style="--c:${PRI[t.priority]?.[1] || "var(--agenda)"}">${icon.check}</span></button>
+              <span class="t">${esc(t.title)}${t.time ? `<small>${t.time}</small>` : ""}</span>
+              ${t.priority === "alta" ? `<span class="tag" style="--c:var(--danger)">Alta</span>` : ""}
+            </div>`).join("")}
+          </div>
+        ` : `
+          <div class="today-all-done">
+            <span class="done-check">✓</span>
+            <p>¡Todo al día! No tienes tareas pendientes hoy.</p>
+          </div>
+        `}
+      </div>
+
       <div class="card-footer-link">
-        <a class="btn small" href="#agenda">Ver agenda completa →</a>
+        <a class="btn small" href="#agenda">Gestionar agenda y eventos →</a>
       </div>
     </section>`;
 }
 
-// ---------- 2. Tarjeta de Salud y Hábitos
+// ---------- 2. Tarjeta de Salud y Diales Fitness (Pasos y Gimnasio)
 function healthCard(state) {
-  const list = habitsToday(state);
-  const doneN = list.filter(h => h.done).length;
-  const header = `
-    <h2 class="card-h">
-      <span class="h-dot" style="--c:var(--hab)"></span>Pulso de Salud y Hábitos
-      <span class="spacer"></span>
-      ${list.length ? `<span class="count num">${doneN}/${list.length}</span>` : ""}
-      <a href="#habitos">Detalles →</a>
-    </h2>`;
+  const today = iso();
+  const yesterday = iso(addDays(new Date(), -1));
+  const activeDate = fitUI.selectedDate || today;
+  const isToday = activeDate === today;
+  const isYesterday = activeDate === yesterday;
 
-  // Comprobar si hay hábito de pasos o datos de reloj
-  const stepHabit = list.find(h => (h.name || "").toLowerCase().includes("paso") || (h.unit || "").toLowerCase().includes("paso"));
+  // Hábito de pasos
+  const stepHabit = state.habits.habits.find(h => h.id === "hb-pasos-salud" || /paso/i.test(h.name || "") || /paso/i.test(h.unit || ""))
+    || { id: "hb-pasos-salud", name: "Pasos", target: 10000, unit: "pasos" };
+  const stepVal = habitValue(state, stepHabit, activeDate) || 0;
+  const stepTgt = stepHabit.target || 10000;
+  const stepPct = Math.round((stepVal / stepTgt) * 100);
+  const stepKm = (stepVal * 0.00075).toFixed(1);
+  const stepKcal = Math.round(stepVal * 0.04);
+  const stepRemaining = Math.max(0, stepTgt - stepVal);
+
+  // Entrenos de Gimnasio en activeDate
+  const gymWorkouts = (state.habits.workouts || []).filter(w => w.date === activeDate && (w.type === "gym" || !w.type));
+  const gymMinutes = gymWorkouts.reduce((s, w) => s + (w.minutes || 0), 0);
+  const gymDone = gymWorkouts.length > 0;
+  const gymPct = gymDone ? Math.max(100, Math.round((gymMinutes / 60) * 100)) : 0;
+  const gymTitle = gymWorkouts[0]?.title || (gymDone ? "Entreno completado" : "Día de descanso");
+
+  // Tira de los últimos 7 días
+  const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const dStr = iso(addDays(new Date(), i - 6));
+    const dVal = habitValue(state, stepHabit, dStr) || 0;
+    const dPct = Math.round((dVal / stepTgt) * 100);
+    const dGym = (state.habits.workouts || []).some(w => w.date === dStr && (w.type === "gym" || !w.type));
+    const dateObj = parseISO(dStr);
+    const dNum = dateObj.getDate();
+    let name = new Intl.DateTimeFormat("es-ES", { weekday: "narrow" }).format(dateObj).toUpperCase();
+    if (dStr === today) name = "Hoy";
+    else if (dStr === yesterday) name = "Ayer";
+    return {
+      date: dStr,
+      name,
+      dayNum: dNum,
+      stepsPct: dPct,
+      gymPct: dGym ? 100 : 0,
+      isSelected: dStr === activeDate
+    };
+  });
+
+  const activeDateLabel = isToday ? "Hoy" : (isYesterday ? "Ayer" : new Intl.DateTimeFormat("es-ES", { weekday: "short", day: "numeric", month: "short" }).format(parseISO(activeDate)));
+
+  // Lista de hábitos regulares
+  const list = habitsToday(state).filter(h => h.id !== stepHabit.id && !/paso/i.test(h.name || ""));
   const lastSleep = [...(state.habits.sleep || [])].sort((a, b) => b.date.localeCompare(a.date))[0];
 
-  let stepsWidget = "";
-  if (stepHabit) {
-    const val = stepHabit.value || 0;
-    const tgt = stepHabit.target || 10000;
-    const pct = Math.min(100, Math.round((val / tgt) * 100));
-    stepsWidget = `
-      <div class="health-step-card">
-        <div class="hsc-top">
-          <span>👟 Pasos de hoy</span>
-          <b class="num">${num1(val)} / ${num1(tgt)}</b>
-        </div>
-        <div class="hsc-bar"><i style="width:${pct}%"></i></div>
-        <div class="hsc-sub">${pct >= 100 ? "¡Objetivo alcanzado!" : `Faltan ${num1(Math.max(0, tgt - val))} pasos (${pct}%)`}</div>
-      </div>`;
-  }
-
-  let sleepWidget = "";
-  if (lastSleep) {
-    sleepWidget = `
-      <div class="health-mini-metric">
-        <span>🌙 Último sueño registrado: <b class="num">${num1(lastSleep.hours)} h</b></span>
-      </div>`;
-  }
-
-  if (!state.habits.habits.length) {
-    return `
-      <section class="card bento-card">
-        ${header}
-        <div class="empty">Aún no tienes hábitos configurados.<br>Entra en <b>Hábitos</b> para activar el seguimiento.</div>
-        <div class="card-footer-link"><a class="btn small" href="#habitos">Configurar hábitos</a></div>
-      </section>`;
-  }
-
   return `
-    <section class="card bento-card">
-      ${header}
-      ${stepsWidget}
-      ${sleepWidget}
+    <section class="card bento-card fitness-bento">
+      <div class="card-h">
+        <span class="h-dot" style="--c:#FA114F"></span>
+        <b>Actividad & Fitness · ${esc(activeDateLabel)}</b>
+        <span class="spacer"></span>
+        <div class="fitness-quick-nav">
+          <button class="pill-btn${isYesterday ? " active" : ""}" type="button" data-act="fit-yesterday">Ayer</button>
+          <button class="pill-btn${isToday ? " active" : ""}" type="button" data-act="fit-today">Hoy</button>
+        </div>
+      </div>
+
+      <!-- Tira interactiva de días con mini-anillos de actividad Apple Fitness -->
+      <div class="fitness-days-strip">
+        ${last7Days.map(d => `
+          <button class="fit-day-chip${d.isSelected ? " selected" : ""}" type="button" 
+            data-act="fit-select-day" data-date="${d.date}" aria-label="Ver actividad del ${d.name} ${d.dayNum}">
+            <span class="fit-d-name">${d.name}</span>
+            <div class="fit-mini-ring">
+              ${fitnessActivityRings({ movePct: d.stepsPct, exercisePct: d.gymPct, size: 34, stroke: 4, gap: 2 })}
+            </div>
+            <span class="fit-d-num num">${d.dayNum}</span>
+          </button>
+        `).join("")}
+      </div>
+
+      <!-- Diales principales estilo Apple Fitness -->
+      <div class="fitness-dials-row">
+        <!-- Dial 1: Pasos (Movimiento) -->
+        <div class="fitness-dial-card steps-card">
+          <div class="fdc-header">
+            <span class="fdc-badge" style="--c:#FA114F">👟 Pasos</span>
+            <span class="fdc-target num">${num1(stepVal)} / ${num1(stepTgt)}</span>
+          </div>
+          <div class="fdc-body">
+            ${fitnessDial({
+              pct: stepPct,
+              kind: "steps",
+              size: 104,
+              stroke: 10,
+              icon: "👟",
+              label: stepPct >= 100 ? "¡Superado!" : `${num1(stepRemaining)} rest.`
+            })}
+            <div class="fdc-stats">
+              <div class="fdc-stat"><small>Distancia</small><b class="num">${stepKm} km</b></div>
+              <div class="fdc-stat"><small>Energía</small><b class="num">${stepKcal} kcal</b></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dial 2: Gimnasio (Ejercicio) -->
+        <div class="fitness-dial-card gym-card">
+          <div class="fdc-header">
+            <span class="fdc-badge" style="--c:#A1F524">🏋️ Gimnasio</span>
+            <span class="fdc-target">${gymDone ? `${gymMinutes} min` : "Descanso"}</span>
+          </div>
+          <div class="fdc-body">
+            ${fitnessDial({
+              pct: gymPct,
+              kind: "gym",
+              size: 104,
+              stroke: 10,
+              icon: "🏋️",
+              label: gymDone ? "Entrenado" : (isToday ? "Pendiente" : "Descanso")
+            })}
+            <div class="fdc-stats">
+              <div class="fdc-stat"><small>Tiempo</small><b class="num">${gymMinutes} min</b></div>
+              <div class="fdc-stat"><small>Sesión</small><b class="truncate" title="${esc(gymTitle)}">${esc(gymTitle)}</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      ${!isToday ? `
+        <div class="fitness-viewing-alert">
+          <span>📅 Viendo datos de <b>${esc(activeDateLabel)}</b></span>
+          <button class="btn small link-btn" type="button" data-act="fit-today">Volver a Hoy →</button>
+        </div>
+      ` : ""}
+
+      <!-- Sueño y otros hábitos -->
+      ${lastSleep ? `
+        <div class="health-mini-metric" style="margin-top:12px">
+          <span>🌙 Último sueño registrado: <b class="num">${num1(lastSleep.hours)} h</b></span>
+        </div>` : ""}
+
       ${list.length ? `
-        <div class="list">${list.map(h => `
+        <div class="list" style="margin-top:10px">${list.slice(0, 4).map(h => `
           <button class="item tap${h.done ? " is-done" : ""}" type="button" data-habit="${h.id}"${h.auto ? ` data-auto="${h.auto}"` : ""} aria-pressed="${h.done}">
-            ${ring(h.pct, "#e88fb4", { size: 34, stroke: 4 })}
+            ${ring(h.pct, "#fa114f", { size: 32, stroke: 4 })}
             <span class="t">${esc(h.name)}<small class="num">${num1(h.value)} / ${num1(h.target)} ${esc(h.unit)}</small></span>
             <span class="tick" style="--c:var(--hab)">${icon.check}</span>
           </button>`).join("")}</div>
-      ` : `<div class="empty">Hoy no tienes hábitos programados.</div>`}
+      ` : ""}
+
       <div class="card-footer-link">
-        <a class="btn small" href="#habitos">Ver hábitos y entrenos →</a>
+        <a class="btn small" href="#habitos">Ver hábitos y entrenos completos →</a>
       </div>
     </section>`;
 }
@@ -295,11 +387,32 @@ function levelCard(state, lv) {
     </section>`;
 }
 
-// ---------- Interacción: marcar tareas y hábitos desde el resumen
+// ---------- Interacción: marcar tareas, hábitos y navegar fitness
 export function mount(root, _state, signal) {
   root.addEventListener("click", e => {
     const wc = e.target.closest("[data-act=weekly-close]");
     if (wc) { closeWeekly(wc.dataset.ws); toast("Lo tienes cuando quieras en «Semanas»"); return; }
+    
+    // Acciones de Fitness / Diales
+    const fitBtn = e.target.closest("[data-act]");
+    if (fitBtn) {
+      if (fitBtn.dataset.act === "fit-select-day") {
+        fitUI.selectedDate = fitBtn.dataset.date;
+        window.dispatchEvent(new Event("pv:render"));
+        return;
+      }
+      if (fitBtn.dataset.act === "fit-yesterday") {
+        fitUI.selectedDate = iso(addDays(new Date(), -1));
+        window.dispatchEvent(new Event("pv:render"));
+        return;
+      }
+      if (fitBtn.dataset.act === "fit-today") {
+        fitUI.selectedDate = null;
+        window.dispatchEvent(new Event("pv:render"));
+        return;
+      }
+    }
+
     const t = e.target.closest("[data-task]");
     if (t) {
       let r = null;

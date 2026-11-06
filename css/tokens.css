@@ -1,7 +1,8 @@
 /* =========================================================
    Tokens de diseño · Panel de Vida
-   Estilo: minimalista «Grafito», oscuro neutro, sin brillos.
-   Cambia aquí los colores y todo el panel se adapta.
+   Estilo: Apple iOS / macOS moderno y refinado.
+   Glassmorphism, iluminación ambiental, colores vibrantes de Apple
+   y tipografía con jerarquía limpia para una experiencia de alta gama.
    ========================================================= */
 
 @font-face {
@@ -15,53 +16,71 @@
 :root {
   color-scheme: dark;
 
-  /* Fondo grafito */
-  --night: #0e0f11;
-  --night-2: #0e0f11;
+  /* Fondo oscuro profundo con matiz de alta gama */
+  --night: #090a0d;
+  --night-2: #101217;
 
-  /* Superficies y líneas */
-  --surface: #17181b;
-  --surface-solid: #17181b;
-  --surface-2: #1d1e22;
-  --line: #26282c;
-  --line-soft: #202226;
+  /* Superficies translúcidas con desenfoque de cristal (Glassmorphism) */
+  --surface: rgba(20, 22, 28, 0.72);
+  --surface-solid: #14161c;
+  --surface-2: rgba(30, 33, 42, 0.65);
+  --surface-glass: rgba(28, 30, 38, 0.55);
+  --surface-hover: rgba(255, 255, 255, 0.05);
+  
+  /* Líneas finas con relieve y brillo superior */
+  --line: rgba(255, 255, 255, 0.09);
+  --line-soft: rgba(255, 255, 255, 0.05);
+  --line-highlight: rgba(255, 255, 255, 0.16);
 
   /* Texto */
-  --fg: #ececee;
-  --muted: #8b9099;
-  --dim: #5d626b;
+  --fg: #f5f6f8;
+  --muted: #9aa0ac;
+  --dim: #636874;
 
-  /* Acento de interfaz y XP (azul suave; se mantiene el nombre --cyan) */
-  --cyan: #7cc4e4;
-  --cyan-deep: #5fb0d6;
+  /* Acento de interfaz y XP (Azul eléctrico de Apple) */
+  --cyan: #0a84ff;
+  --cyan-deep: #0071e3;
+  --cyan-glow: rgba(10, 132, 255, 0.28);
 
-  /* Un color por área */
-  --fin: #7fcf9b;     /* Finanzas */
-  --work: #7ea6f0;    /* Trabajo y estudios */
-  --hab: #e88fb4;     /* Hábitos y deporte */
-  --agenda: #e0b467;  /* Agenda y tareas */
+  /* Colores vibrantes estilo Apple */
+  --fin: #34c759;            /* Finanzas (Apple Finance Green) */
+  --work: #5e5ce6;           /* Trabajo y estudios (Apple Indigo) */
+  --hab: #fa114f;            /* Hábitos y Fitness Move (Apple Fitness Pink/Red) */
+  --gym: #a1f524;            /* Gimnasio y Workout (Apple Fitness Neon Lime) */
+  --agenda: #ff9f0a;         /* Agenda y tareas (Apple Warm Amber) */
+  --agenda-apple: #ff3b30;   /* Rojo icónico Calendario Apple */
+  --purple: #bf5af2;         /* Púrpura Apple */
 
   /* Estados */
-  --ok: #7fcf9b;
-  --warn: #e0b467;
-  --danger: #e5736b;
+  --ok: #34c759;
+  --warn: #ffd60a;
+  --danger: #ff453a;
 
   /* Tipografía */
-  --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", system-ui, sans-serif;
   --fs-xs: 11px;
   --fs-sm: 12px;
   --fs-md: 14px;
   --fs-lg: 16px;
   --fs-xl: 22px;
   --fs-xxl: 28px;
+  --fs-hero: 34px;
 
-  /* Forma */
-  --r: 14px;
-  --r-lg: 14px;
-  --gap: 14px;
+  /* Forma y curvaturas modernas */
+  --r: 18px;
+  --r-sm: 12px;
+  --r-lg: 22px;
+  --r-pill: 9999px;
+  --gap: 16px;
+
+  /* Sombras y profundidad */
+  --shadow-card: 0 10px 30px -8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --shadow-modal: 0 24px 60px -12px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --shadow-glow: 0 4px 20px rgba(10, 132, 255, 0.3);
+  --shadow-fitness: 0 4px 24px rgba(250, 17, 79, 0.35);
 
   /* Áreas seguras de iPhone */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --tabbar-h: 58px;
+  --tabbar-h: 62px;
 }

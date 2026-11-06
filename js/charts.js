@@ -198,3 +198,110 @@ export function trendChart(points, { color = "#e88fb4", format = v => v, from, t
   }
   return `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="Tendencia">${g}</svg>`;
 }
+
+
+/**
+ * Anillo / Dial individual estilo Apple Fitness con gradiente vibrante, glow y punta redondeada.
+ */
+export function fitnessDial({
+  pct = 0,
+  kind = "steps", // "steps" | "gym" | "stand"
+  size = 114,
+  stroke = 11,
+  val = "",
+  tgt = "",
+  unit = "",
+  icon = "",
+  label = ""
+} = {}) {
+  const p = Math.max(0, pct);
+  const schemes = {
+    steps: { from: "#FA114F", to: "#FF5252", track: "rgba(250, 17, 79, 0.16)", glow: "rgba(250, 17, 79, 0.45)" },
+    gym: { from: "#A1F524", to: "#2BFB54", track: "rgba(161, 245, 36, 0.16)", glow: "rgba(161, 245, 36, 0.45)" },
+    stand: { from: "#00F0FF", to: "#0A84FF", track: "rgba(0, 240, 255, 0.16)", glow: "rgba(0, 240, 255, 0.45)" }
+  };
+  const sc = schemes[kind] || schemes.steps;
+  const gid = `fd-${kind}-${Math.random().toString(36).slice(2, 7)}`;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const dashOffset = c * Math.max(0, (1 - Math.min(100, p) / 100));
+
+  return `
+    <div class="fitness-dial" style="--fd-glow:${sc.glow}">
+      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="fd-svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="${gid}" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="${sc.from}" />
+            <stop offset="100%" stop-color="${sc.to}" />
+          </linearGradient>
+          <filter id="${gid}-glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="0" stdDeviation="3.5" flood-color="${sc.from}" flood-opacity="0.65"/>
+          </filter>
+        </defs>
+        <!-- Pista circular -->
+        <circle cx="${size / 2}" cy="${size / 2}" r="${r1(r)}" fill="none" stroke="${sc.track}" stroke-width="${stroke}" />
+        <!-- Progreso con gradiente y sombra luminosa -->
+        ${p > 0 ? `
+          <circle cx="${size / 2}" cy="${size / 2}" r="${r1(r)}" fill="none" 
+            stroke="url(#${gid})" stroke-width="${stroke}" stroke-linecap="round"
+            stroke-dasharray="${r1(c)}" stroke-dashoffset="${r1(dashOffset)}"
+            transform="rotate(-90 ${size / 2} ${size / 2})"
+            filter="url(#${gid}-glow)"
+          />` : ""}
+      </svg>
+      <div class="fd-content">
+        ${icon ? `<span class="fd-icon">${icon}</span>` : ""}
+        <span class="fd-pct num">${Math.round(p)}%</span>
+        ${label ? `<small class="fd-label">${label}</small>` : ""}
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Anillos concéntricos clásicos de Apple Fitness (Movimiento / Ejercicio / Actividad)
+ */
+export function fitnessActivityRings({
+  movePct = 0,
+  exercisePct = 0,
+  standPct = 0,
+  size = 144,
+  stroke = 12,
+  gap = 3
+} = {}) {
+  const rings = [
+    { pct: movePct, from: "#FA114F", to: "#FF2442", track: "rgba(250, 17, 79, 0.16)" },
+    { pct: exercisePct, from: "#A1F524", to: "#2BFB54", track: "rgba(161, 245, 36, 0.16)" },
+    { pct: standPct, from: "#00F0FF", to: "#0A84FF", track: "rgba(0, 240, 255, 0.16)" }
+  ];
+  const uid = Math.random().toString(36).slice(2, 6);
+  let svgPaths = "";
+  let defs = "";
+
+  rings.forEach((rg, idx) => {
+    const r = (size - stroke) / 2 - idx * (stroke + gap);
+    if (r <= 0) return;
+    const c = 2 * Math.PI * r;
+    const p = Math.max(0, Math.min(100, rg.pct));
+    const offset = c * (1 - p / 100);
+    const gid = `ar-${uid}-${idx}`;
+
+    defs += `
+      <linearGradient id="${gid}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${rg.from}"/>
+        <stop offset="100%" stop-color="${rg.to}"/>
+      </linearGradient>
+    `;
+
+    svgPaths += `
+      <circle cx="${size / 2}" cy="${size / 2}" r="${r1(r)}" fill="none" stroke="${rg.track}" stroke-width="${stroke}"/>
+      ${p > 0 ? `<circle cx="${size / 2}" cy="${size / 2}" r="${r1(r)}" fill="none" stroke="url(#${gid})" stroke-width="${stroke}" stroke-linecap="round"
+        stroke-dasharray="${r1(c)}" stroke-dashoffset="${r1(offset)}" transform="rotate(-90 ${size / 2} ${size / 2})"/>` : ""}
+    `;
+  });
+
+  return `<svg class="fitness-rings-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-label="Anillos de actividad Apple Fitness">
+    <defs>${defs}</defs>
+    ${svgPaths}
+  </svg>`;
+}
