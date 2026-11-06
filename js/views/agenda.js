@@ -1,5 +1,5 @@
-// Agenda estilo Calendario de iPhone: vista diaria con timeline por horas,
-// tira semanal interactiva de 7 días, cuadrícula mensual y tareas estilo Recordatorios de Apple.
+// Agenda estilo Calendario de iPhone: vista mensual con cuadrícula de días,
+// navegación de mes y año, anotación rápida y recuadro de próximas fechas registradas.
 
 import { areaHeader } from "./area.js";
 import { esc, toast } from "../ui.js";
@@ -10,9 +10,9 @@ import { registerQuickAction } from "../quickadd.js";
 import { PRIORITY_COLOR, REPEATS, toggleTask, groupTasks, allTags, agendaSummary, dayItems, monthGrid } from "../agenda.js";
 import { openTaskForm, openEventForm, openExport } from "./agenda-forms.js";
 
-// Por defecto arranca en "agenda" (vista diaria estilo iPhone Calendar)
-const ui = { tab: "agenda", filter: "pending", tag: null, ym: iso().slice(0, 7), day: iso() };
-const TABS = { agenda: "Día", mes: "Mes", tareas: "Tareas" };
+// Por defecto arranca en "mes" (vista de Calendario completa)
+const ui = { tab: "mes", filter: "pending", tag: null, ym: iso().slice(0, 7), day: iso() };
+const TABS = { mes: "Calendario", agenda: "Día", tareas: "Tareas" };
 
 registerQuickAction("task", () => openTaskForm());
 
@@ -24,6 +24,10 @@ const monthLabel = ym => {
 const shiftMonth = (ym, n) => { 
   const [y, m] = ym.split("-").map(Number); 
   return iso(new Date(y, m - 1 + n, 1)).slice(0, 7); 
+};
+const shiftYear = (ym, n) => {
+  const [y, m] = ym.split("-").map(Number);
+  return `${y + n}-${String(m).padStart(2, "0")}`;
 };
 const shortDate = s => new Intl.DateTimeFormat("es-ES", { weekday: "short", day: "numeric", month: "short" }).format(parseISO(s)).replace(/\./g, "");
 const longDay = s => { 
@@ -37,7 +41,7 @@ function taskRow(t, { showDate = true } = {}) {
   const meta = [
     showDate && t.due ? `<span class="${!t.done && t.due < today ? "late" : ""}">${t.due === today ? "Hoy" : shortDate(t.due)}</span>` : "",
     t.time ? `${t.time}` : "",
-    t.repeat ? `↻ ${REPEATS[t.repeat]}` : "",
+    t.repeat ? `↺ ${REPEATS[t.repeat]}` : "",
     ...(t.tags || []).map(x => `#${esc(x)}`)
   ].filter(Boolean).join(" · ");
 
@@ -65,47 +69,215 @@ function eventRow(e) {
   </button>`;
 }
 
-export function render(state) {
-  const sum = agendaSummary(state);
+/** Recuadro con las Fechas Próximas Registradas */
+function upcomingDatesBox(state) {
   const today = iso();
-  const isToday = ui.day === today;
+  const allEvents = (state.agenda.events || [])
+    .filter(e => e.date >= today)
+    .map(e => ({
+      type: "event",
+      id: e.id,
+      date: e.date,
+      title: e.title,
+      subtitle: e.allDay ? "Todo el día" : (e.start ? e.start.slice(11, 16) : ""),
+      place: e.place || "",
+      note: e.note || ""
+    }));
 
+  const allTasks = (state.agenda.tasks || [])
+    .filter(t => !t.done && t.due && t.due >= today)
+    .map(t => ({
+      type: "task",
+      id: t.id,
+      date: t.due,
+      title: t.title,
+      subtitle: t.time || "",
+      priority: t.priority || "media",
+      tags: t.tags || []
+    }));
+
+  const combined = [...allEvents, ...allTasks].sort((a, b) => {
+    const diff = a.date.localeCompare(b.date);
+    if (diff !== 0) return diff;
+    return (a.subtitle || "").localeCompare(b.subtitle || "");
+  }).slice(0, 10);
+
+  const relLabel = dStr => {
+    if (dStr === today) return { text: "Hoy", cls: "is-today" };
+    const diffDays = Math.round((parseISO(dStr) - parseISO(today)) / 86400000);
+    if (diffDays === 1) return { text: "Mañana", cls: "is-tomorrow" };
+    if (diffDays <= 7) return { text: `En ${diffDays}d`, cls: "is-soon" };
+    return { text: new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short" }).format(parseISO(dStr)).replace(/\./g, ""), cls: "" };
+  };
+
+  return `
+    <section class="card upcoming-dates-card">
+      <div class="card-h">
+        <span class="h-dot" style="--c:var(--cyan)"></span>
+        <b>Fechas próximas y eventos registrados</b>
+        <span class="spacer"></span>
+        <button class="btn small" type="button" data-act="new-event">+ Nueva fecha</button>
+      </div>
+
+      ${combined.length ? `
+        <div class="upcoming-list">
+          ${combined.map(item => {
+            const rel = relLabel(item.date);
+            const isTask = item.type === "task";
+            return `
+              <div class="upcoming-item">
+                <span class="up-date-badge ${rel.cls}">${rel.text}</span>
+                <div class="up-info">
+                  <span class="up-title">${isTask ? "📌 " : "📅 "}${esc(item.title)}</span>
+                  <span class="up-meta">
+                    <span>${shortDate(item.date)}</span>
+                    ${item.subtitle ? `<span>· ${item.subtitle}</span>` : ""}
+                    ${item.place ? `<span>· 📍 ${esc(item.place)}</span>` : ""}
+                    ${item.tags && item.tags.length ? `<span>· #${esc(item.tags[0])}</span>` : ""}
+                  </span>
+                </div>
+                <div class="up-act">
+                  ${isTask ? `
+                    <button class="tick-btn" type="button" data-act="toggle" data-id="${item.id}" title="Marcar como hecha">
+                      <span class="tick" style="--c:${PRIORITY_COLOR[item.priority] || "var(--agenda)"}">${icon.check}</span>
+                    </button>
+                  ` : `
+                    <button class="icon-btn small" type="button" data-act="edit-event" data-id="${item.id}" title="Ver evento">
+                      ${icon.chevron}
+                    </button>
+                  `}
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      ` : `
+        <div class="empty" style="padding:16px 8px;text-align:center">
+          No hay fechas próximas registradas todavía.<br>
+          <small class="muted">Toca en cualquier día del calendario o en <b>+ Nueva fecha</b> para anotar tus exámenes, eventos o entregas.</small>
+        </div>
+      `}
+    </section>
+  `;
+}
+
+export function render(state) {
   return `
     ${areaHeader(state, "ag")}
 
-    <!-- Cabecera Apple Calendar: Navegación de Fecha, Selector de Vistas y Botón Hoy -->
-    <header class="apple-cal-header card">
+    <!-- Selector de vistas estilo iOS Segmented Control -->
+    <div class="ios-segmented-control" role="tablist" style="margin-bottom:12px">
+      ${Object.entries(TABS).map(([k, l]) =>
+        `<button type="button" role="tab" class="ios-seg-tab${ui.tab === k ? " active" : ""}" data-act="tab" data-tab="${k}" aria-selected="${ui.tab === k}">${l}</button>`).join("")}
+    </div>
+
+    <!-- Contenido según la pestaña activa -->
+    ${ui.tab === "mes" ? mesTab(state) : (ui.tab === "agenda" ? dayTimelineTab(state) : tareasTab(state))}`;
+}
+
+/** Vista Cuadrícula Mensual Completa */
+function mesTab(state) {
+  const cells = monthGrid(state, ui.ym);
+  const { events, tasks } = dayItems(state, ui.day);
+  const [currentY, currentM] = ui.ym.split("-").map(Number);
+  const today = iso();
+  const isTodayMonth = ui.ym === today.slice(0, 7);
+  const isTodayDay = ui.day === today;
+
+  const months = [
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+  ];
+  const years = [2024, 2025, 2026, 2027, 2028, 2029, 2030];
+
+  return `
+    <!-- Barra de Navegación de Mes y Año -->
+    <section class="card" style="padding-bottom:12px">
       <div class="cal-nav-bar">
         <div class="cal-title-box">
           <div class="cal-month-title">${monthLabel(ui.ym)}</div>
           <small class="muted">${longDay(ui.day)}</small>
         </div>
         <div class="cal-nav-buttons">
-          <button class="icon-btn ios-nav-arrow" type="button" data-act="prev-week" aria-label="Semana anterior">${icon.back}</button>
-          <button class="ios-pill-btn${isToday ? " primary" : ""}" type="button" data-act="go-today">Hoy</button>
-          <button class="icon-btn ios-nav-arrow" type="button" data-act="next-week" aria-label="Semana siguiente">${icon.chevron}</button>
+          <button class="icon-btn ios-nav-arrow" type="button" data-act="year" data-n="-1" title="Año anterior («)">«</button>
+          <button class="icon-btn ios-nav-arrow" type="button" data-act="month" data-n="-1" title="Mes anterior">${icon.back}</button>
+          <button class="ios-pill-btn${isTodayMonth && isTodayDay ? " primary" : ""}" type="button" data-act="go-today">Hoy</button>
+          <button class="icon-btn ios-nav-arrow" type="button" data-act="month" data-n="1" title="Mes siguiente">${icon.chevron}</button>
+          <button class="icon-btn ios-nav-arrow" type="button" data-act="year" data-n="1" title="Año siguiente (»)">»</button>
         </div>
       </div>
 
-      <!-- Tira interactiva de 7 días de la semana activa estilo iPhone -->
-      ${renderWeekStrip(state)}
-
-      <!-- Selector de vistas estilo iOS Segmented Control -->
-      <div class="ios-segmented-control" role="tablist">
-        ${Object.entries(TABS).map(([k, l]) =>
-          `<button type="button" role="tab" class="ios-seg-tab${ui.tab === k ? " active" : ""}" data-act="tab" data-tab="${k}" aria-selected="${ui.tab === k}">${l}</button>`).join("")}
-      </div>
-
-      <!-- Botones de Acción Rápida -->
-      <div class="btn-row" style="margin-top:4px">
-        <button class="btn primary" type="button" data-act="new-event-day" style="--c:var(--agenda-apple)">${icon.clock} + Evento</button>
-        <button class="btn" type="button" data-act="new-task-day">${icon.plus} + Tarea</button>
+      <!-- Selectores de Salto Rápido de Mes y Año -->
+      <div class="cal-jump-bar">
+        <select class="cal-jump-select" data-act="jump-month" aria-label="Seleccionar mes">
+          ${months.map((mName, mIdx) => `
+            <option value="${String(mIdx + 1).padStart(2, "0")}"${mIdx + 1 === currentM ? " selected" : ""}>${mName}</option>
+          `).join("")}
+        </select>
+        <select class="cal-jump-select" data-act="jump-year" aria-label="Seleccionar año">
+          ${years.map(yNum => `
+            <option value="${yNum}"${yNum === currentY ? " selected" : ""}>${yNum}</option>
+          `).join("")}
+        </select>
         <button class="icon-btn" type="button" data-act="export" title="Exportar al Calendario del iPhone" style="margin-left:auto">${icon.ag}</button>
       </div>
-    </header>
 
-    <!-- Contenido según la pestaña activa -->
-    ${ui.tab === "agenda" ? dayTimelineTab(state) : (ui.tab === "mes" ? mesTab(state) : tareasTab(state))}`;
+      <!-- Cuadrícula Mensual Completa con todos los días del mes -->
+      <div class="cal">
+        ${["L", "M", "X", "J", "V", "S", "D"].map(d => `<span class="cal-h">${d}</span>`).join("")}
+        ${cells.map(c => `
+          <button type="button" class="cal-d${c.inMonth ? "" : " out"}${c.today ? " today" : ""}${c.date === ui.day ? " sel" : ""}" 
+            data-act="day" data-date="${c.date}" aria-label="${longDay(c.date)}">
+            <span class="num">${c.day}</span>
+            <span class="cal-dots">
+              ${c.events ? `<i class="ev" title="${c.events} eventos"></i>` : ""}
+              ${c.tasks ? `<i class="${c.overdue ? "late" : "tk"}" title="${c.tasks} tareas"></i>` : ""}
+              ${c.workouts ? `<i class="gym" title="Entreno"></i>` : ""}
+            </span>
+          </button>
+        `).join("")}
+      </div>
+
+      <div class="legend" style="margin-top:10px">
+        <span style="--c:var(--cyan)">Evento</span>
+        <span style="--c:var(--agenda)">Tarea</span>
+        <span style="--c:#A1F524">Entreno</span>
+        <span style="--c:var(--danger)">Atrasada</span>
+      </div>
+    </section>
+
+    <!-- Sección del Día Seleccionado y Anotar Cosas -->
+    <section class="card">
+      <div class="card-h">
+        <span class="h-dot" style="--c:var(--agenda)"></span>
+        <b>${longDay(ui.day)}</b>
+        <span class="spacer"></span>
+        <div class="btn-row" style="margin:0">
+          <button class="btn small primary" type="button" data-act="new-task-day">+ Tarea</button>
+          <button class="btn small" type="button" data-act="new-event-day">+ Evento</button>
+        </div>
+      </div>
+
+      <!-- Formulario rápido para anotar algo en este día -->
+      <form class="agenda-inline-add" data-act="inline-add">
+        <input class="input" type="text" id="inline-note-inp" placeholder="Anotar algo rápido para el ${shortDate(ui.day)}..." autocomplete="off" required>
+        <button class="btn primary" type="submit">+ Anotar</button>
+      </form>
+
+      ${events.length || tasks.length ? `
+        ${events.length ? `<div class="list" style="margin-bottom:8px">${events.map(eventRow).join("")}</div>` : ""}
+        ${tasks.length ? `<div class="list">${tasks.map(t => taskRow(t, { showDate: false })).join("")}</div>` : ""}
+      ` : `
+        <div class="empty" style="padding:12px;text-align:center">
+          Nada programado para este día.<br>
+          <small class="muted">Escribe arriba para anotar algo al instante o pulsa + Tarea / + Evento.</small>
+        </div>
+      `}
+    </section>
+
+    <!-- Recuadro con las Fechas Próximas Registradas -->
+    ${upcomingDatesBox(state)}
+  `;
 }
 
 /** Tira semanal de 7 días estilo Calendario de iPhone */
@@ -159,9 +331,8 @@ function dayTimelineTab(state) {
   const unTimedTasks = tasks.filter(t => !t.time);
 
   // Horas del timeline (de 08:00 a 22:00)
-  const hours = Array.from({ length: 15 }, (_, i) => i + 8); // 8 to 22
+  const hours = Array.from({ length: 15 }, (_, i) => i + 8);
 
-  // Cálculo de línea de hora actual
   const now = new Date();
   const currentHour = now.getHours();
   const currentMin = now.getMinutes();
@@ -169,15 +340,36 @@ function dayTimelineTab(state) {
   const nowTopPercent = showNowLine ? (((currentHour - 8) + (currentMin / 60)) / 15) * 100 : null;
 
   return `
+    <header class="apple-cal-header card">
+      <div class="cal-nav-bar">
+        <div class="cal-title-box">
+          <div class="cal-month-title">${monthLabel(ui.ym)}</div>
+          <small class="muted">${longDay(ui.day)}</small>
+        </div>
+        <div class="cal-nav-buttons">
+          <button class="icon-btn ios-nav-arrow" type="button" data-act="prev-week" aria-label="Semana anterior">${icon.back}</button>
+          <button class="ios-pill-btn${isToday ? " primary" : ""}" type="button" data-act="go-today">Hoy</button>
+          <button class="icon-btn ios-nav-arrow" type="button" data-act="next-week" aria-label="Semana siguiente">${icon.chevron}</button>
+        </div>
+      </div>
+
+      ${renderWeekStrip(state)}
+
+      <div class="btn-row" style="margin-top:4px">
+        <button class="btn primary" type="button" data-act="new-event-day" style="--c:var(--agenda-apple)">${icon.clock} + Evento</button>
+        <button class="btn" type="button" data-act="new-task-day">${icon.plus} + Tarea</button>
+        <button class="icon-btn" type="button" data-act="export" title="Exportar al Calendario del iPhone" style="margin-left:auto">${icon.ag}</button>
+      </div>
+    </header>
+
     <section class="card apple-timeline-card">
       <div class="card-h">
         <span class="h-dot" style="--c:var(--agenda-apple)"></span>
-        <b>${longDay(ui.day)}</b>
+        <b>Línea de tiempo · ${longDay(ui.day)}</b>
         <span class="spacer"></span>
         <span class="count num">${events.length} ev. · ${tasks.length} tar.</span>
       </div>
 
-      <!-- Sección Todo el Día (si hay eventos sin hora) -->
       ${allDayEvents.length || unTimedTasks.length ? `
         <div class="ios-allday-box">
           <div class="ios-allday-label">Todo el día</div>
@@ -199,7 +391,6 @@ function dayTimelineTab(state) {
         </div>
       ` : ""}
 
-      <!-- Línea de tiempo horaria (08:00 a 22:00) -->
       <div class="ios-timeline">
         ${showNowLine ? `
           <div class="timeline-now-line" style="top:${nowTopPercent.toFixed(2)}%">
@@ -244,7 +435,6 @@ function dayTimelineTab(state) {
         }).join("")}
       </div>
 
-      <!-- Recordatorios / Tareas pendientes del día -->
       ${tasks.length ? `
         <div class="ios-reminders-box" style="margin-top:16px">
           <div class="card-h" style="padding:0 0 8px">
@@ -258,45 +448,6 @@ function dayTimelineTab(state) {
       ` : ""}
     </section>
   `;
-}
-
-/** Vista Cuadrícula Mensual */
-function mesTab(state) {
-  const cells = monthGrid(state, ui.ym);
-  const { events, tasks } = dayItems(state, ui.day);
-
-  return `
-    <section class="card">
-      <div class="month-nav" style="margin-top:0">
-        <button class="icon-btn" type="button" data-act="month" data-n="-1" aria-label="Mes anterior">${icon.back}</button>
-        <b>${monthLabel(ui.ym)}</b>
-        <button class="icon-btn" type="button" data-act="month" data-n="1" aria-label="Mes siguiente">${icon.chevron}</button>
-      </div>
-      <div class="cal">
-        ${["L", "M", "X", "J", "V", "S", "D"].map(d => `<span class="cal-h">${d}</span>`).join("")}
-        ${cells.map(c => `<button type="button" class="cal-d${c.inMonth ? "" : " out"}${c.today ? " today" : ""}${c.date === ui.day ? " sel" : ""}" data-act="day" data-date="${c.date}" aria-label="${longDay(c.date)}${c.events ? `, ${c.events} eventos` : ""}${c.tasks ? `, ${c.tasks} tareas` : ""}">
-          <span class="num">${c.day}</span>
-          <span class="cal-dots">${c.events ? `<i class="ev"></i>` : ""}${c.tasks ? `<i class="${c.overdue ? "late" : "tk"}"></i>` : ""}</span>
-        </button>`).join("")}
-      </div>
-      <div class="legend">
-        <span style="--c:var(--cyan)">Evento</span>
-        <span style="--c:var(--agenda)">Tarea</span>
-        <span style="--c:var(--danger)">Atrasada</span>
-      </div>
-      ${ui.ym !== iso().slice(0, 7) || ui.day !== iso() ? `<button class="btn small link-btn" type="button" data-act="go-today">Ir a hoy</button>` : ""}
-    </section>
-    <section class="card">
-      <h2 class="card-h">${longDay(ui.day)}<span class="spacer"></span></h2>
-      ${events.length || tasks.length ? `
-        ${events.length ? `<div class="list">${events.map(eventRow).join("")}</div>` : ""}
-        ${tasks.length ? `<div class="list">${tasks.map(t => taskRow(t, { showDate: false })).join("")}</div>` : ""}`
-        : `<div class="empty">Nada programado para este día.</div>`}
-      <div class="btn-row" style="margin-top:12px">
-        <button class="btn small" type="button" data-act="new-event-day">+ Evento este día</button>
-        <button class="btn small" type="button" data-act="new-task-day">+ Tarea este día</button>
-      </div>
-    </section>`;
 }
 
 /** Vista Lista de Tareas estilo Recordatorios */
@@ -336,6 +487,7 @@ export function mount(root, _state, signal) {
       case "filter": ui.filter = b.dataset.f; rerender(); break;
       case "tag": ui.tag = ui.tag?.toLowerCase() === b.dataset.tag.toLowerCase() ? null : b.dataset.tag; rerender(); break;
       case "month": ui.ym = shiftMonth(ui.ym, Number(b.dataset.n)); rerender(); break;
+      case "year": ui.ym = shiftYear(ui.ym, Number(b.dataset.n)); rerender(); break;
       case "prev-week": {
         const d = parseISO(ui.day);
         ui.day = iso(addDays(d, -7));
@@ -367,5 +519,50 @@ export function mount(root, _state, signal) {
       case "edit-event": openEventForm({ id }); break;
       case "export": openExport(); break;
     }
+  }, { signal });
+
+  // Manejar saltos de mes y año desde los selectores
+  root.addEventListener("change", e => {
+    const sel = e.target;
+    if (sel.dataset.act === "jump-month") {
+      const [y] = ui.ym.split("-");
+      ui.ym = `${y}-${sel.value}`;
+      window.dispatchEvent(new Event("pv:render"));
+    } else if (sel.dataset.act === "jump-year") {
+      const [, m] = ui.ym.split("-");
+      ui.ym = `${sel.value}-${m}`;
+      window.dispatchEvent(new Event("pv:render"));
+    }
+  }, { signal });
+
+  // Manejar formulario inline de anotación rápida
+  root.addEventListener("submit", e => {
+    const f = e.target.closest("[data-act=inline-add]");
+    if (!f) return;
+    e.preventDefault();
+    const inp = f.querySelector("#inline-note-inp");
+    const val = (inp?.value || "").trim();
+    if (!val) return;
+    const nid = `tk-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    update(s => {
+      s.agenda.tasks.push({
+        id: nid,
+        title: val,
+        due: ui.day,
+        time: null,
+        priority: "media",
+        tags: [],
+        note: "",
+        repeat: null,
+        done: false,
+        doneAt: null,
+        createdAt: iso(),
+        updatedAt: new Date().toISOString(),
+        source: "panel"
+      });
+    });
+    toast(`Anotado para el ${shortDate(ui.day)}: "${val}"`);
+    inp.value = "";
+    window.dispatchEvent(new Event("pv:render"));
   }, { signal });
 }
