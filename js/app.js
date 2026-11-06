@@ -132,6 +132,8 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
   });
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("sw.js").then(reg => {
+      // Comprobar actualización de forma inmediata al abrir la app
+      reg.update().catch(() => {});
       // Comprobar si hay versión nueva cada vez que la app vuelve a primer plano
       document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
     }).catch(console.error);

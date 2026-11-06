@@ -14,7 +14,7 @@ import { syncConfigured } from "../sync.js";
 import { hasAnyData } from "../stats.js";
 
 const fmt = iso => iso ? new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)) : "Nunca";
-const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const isStandalone = () => (typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(display-mode: standalone)").matches) || (typeof navigator !== "undefined" && navigator.standalone === true);
 
 export function render(state) {
   const last = state.settings.lastBackupAt;

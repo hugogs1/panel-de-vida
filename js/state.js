@@ -226,8 +226,8 @@ let saveTimer = null;
 export async function loadState() {
   let stored = null;
   try { stored = await dbGet(KEY); } catch (e) { console.error("No se pudo leer IndexedDB", e); }
-  state = stored ? migrate(stored) : defaultState();
-  await persist();
+  state = stored ? migrate(stored) : ensureAutoHabits(defaultState());
+  try { await persist(); } catch (e) { console.error("No se pudo persistir el estado inicial", e); }
   return state;
 }
 

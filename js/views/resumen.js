@@ -17,7 +17,7 @@ const num1 = n => new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 }).f
 const signed = n => n > 0 ? `+${eur(n)}` : eur(n);
 
 const fitUI = {
-  selectedDate: (typeof localStorage !== "undefined" && localStorage.getItem("pv_fit_selected_date")) || null
+  selectedDate: null // Al cargar la app, siempre inicia en HOY (iso())
 };
 
 const greeting = () => {
@@ -306,7 +306,7 @@ function healthCard(state) {
         </div>
 
         <!-- Dial 2: Gimnasio (Fuerza / Rutinas) -->
-        <div class="fitness-dial-card gym-card">
+        <div class="fitness-dial-card gym-card" data-act="fit-adjust-steps" style="cursor:pointer" title="Toca para registrar o ajustar entreno">
           <div class="fdc-header">
             <span class="fdc-badge" style="--c:#A1F524">🏋️ Gimnasio</span>
             <span class="fdc-target">${gymDone ? `${gymMinutes}m` : "Descanso"}</span>
@@ -328,7 +328,7 @@ function healthCard(state) {
         </div>
 
         <!-- Dial 3: Deporte & Actividad (Caminar, Correr, Boxeo, Fútbol...) -->
-        <div class="fitness-dial-card sport-card">
+        <div class="fitness-dial-card sport-card" data-act="fit-adjust-steps" style="cursor:pointer" title="Toca para registrar o ajustar actividad">
           <div class="fdc-header">
             <span class="fdc-badge" style="--c:#00F0FF">⚡ Deporte</span>
             <span class="fdc-target">${sportDone ? `${sportMinutes}m` : "0m"}</span>
@@ -470,36 +470,44 @@ export function openAdjustStepsModal(state, targetDate) {
   const isYesterday = targetDate === iso(addDays(new Date(), -1));
   const dateLabel = isToday ? "Hoy" : (isYesterday ? "Ayer" : new Intl.DateTimeFormat("es-ES", { weekday: "short", day: "numeric", month: "short" }).format(parseISO(targetDate)));
 
-  const existingGym = (state.habits.workouts || []).find(w => w.date === targetDate && w.type === "gym" && (!w.sport || w.sport === "gym"));
+  const existingGym = (state.habits.workouts || []).find(w => w.date === targetDate && (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym"));
   const existingWalk = (state.habits.workouts || []).find(w => w.date === targetDate && (w.type === "deporte" || w.sport === "andar"));
+  const existingOther = (state.habits.workouts || []).find(w => w.date === targetDate && (w.type === "deporte" || w.type === "futbol") && w.sport !== "andar");
 
   openSheet(`
     <h2 style="display:flex;align-items:center;gap:8px">
-      <span style="color:#FA114F">👟</span> Actividad y Pasos · ${esc(dateLabel)}
+      <span style="color:#FA114F">👟</span> Actividad y Fitness — ${esc(dateLabel)}
     </h2>
-    <p style="margin-top:6px;color:var(--muted)">Ajusta los pasos de tu reloj Xiaomi / Salud y confirma tus entrenos y caminatas.</p>
+    <p style="margin-top:6px;color:var(--muted)">Ajusta los pasos de tu reloj Xiaomi / Salud y confirma tus entrenos y deportes.</p>
     <form id="form-adjust-steps" style="display:grid;gap:16px;margin-top:16px">
       <label class="field">
         <span>Número de pasos</span>
         <input type="number" id="inp-steps" name="steps" min="0" max="100000" step="1" 
-          value="${currentVal > 0 ? currentVal : (isYesterday ? 13930 : "")}" placeholder="Ej. 13930" required autofocus 
+          value="${currentVal > 0 ? currentVal : (isYesterday ? 13930 : "")}" placeholder="Ej. 10000" required autofocus 
           style="font-size:22px;font-weight:700;padding:12px;border-radius:12px;text-align:center">
       </label>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <label class="field" style="display:flex;flex-direction:column;gap:6px">
-          <span style="font-size:12px;color:var(--muted)">🏋️ Gimnasio</span>
+          <span style="font-size:12px;color:var(--muted)">🏋️‍♂️ Gimnasio</span>
           <select id="sel-gym" class="input" style="padding:10px;border-radius:10px;font-size:13px;font-weight:600">
-            <option value="descanso"${!existingGym || targetDate === "2026-11-05" ? " selected" : ""}>🛌 Descanso (0 min)</option>
-            <option value="entreno"${existingGym && targetDate !== "2026-11-05" ? " selected" : ""}>🏋️ Entrenado (${existingGym ? existingGym.minutes : 60} min)</option>
+            <option value="descanso"${!existingGym || targetDate === "2026-11-05" ? " selected" : ""}>💤 Descanso (0 min)</option>
+            <option value="60"${existingGym && (existingGym.minutes || 60) === 60 && targetDate !== "2026-11-05" ? " selected" : ""}>🏋️‍♂️ 60 min (Fuerza)</option>
+            <option value="75"${existingGym && existingGym.minutes === 75 && targetDate !== "2026-11-05" ? " selected" : ""}>🏋️‍♂️ 75 min (Fuerza)</option>
+            <option value="90"${existingGym && existingGym.minutes === 90 && targetDate !== "2026-11-05" ? " selected" : ""}>🏋️‍♂️ 90 min (Fuerza)</option>
+            <option value="45"${existingGym && existingGym.minutes === 45 && targetDate !== "2026-11-05" ? " selected" : ""}>🏋️‍♂️ 45 min (Fuerza)</option>
           </select>
         </label>
 
         <label class="field" style="display:flex;flex-direction:column;gap:6px">
-          <span style="font-size:12px;color:var(--muted)">🚶 Caminata / Paseo</span>
-          <select id="sel-walk" class="input" style="padding:10px;border-radius:10px;font-size:13px;font-weight:600">
-            <option value="si"${existingWalk || isYesterday || targetDate <= "2026-11-05" ? " selected" : ""}>🚶 Salí a pasear (${existingWalk ? existingWalk.minutes : (targetDate === "2026-11-05" ? 60 : 45)} min)</option>
-            <option value="no"${!existingWalk && !isYesterday && targetDate > "2026-11-05" ? " selected" : ""}>Sin caminata</option>
+          <span style="font-size:12px;color:var(--muted)">⚡ Deporte / Actividad</span>
+          <select id="sel-sport" class="input" style="padding:10px;border-radius:10px;font-size:13px;font-weight:600">
+            <option value="no"${!existingWalk && !existingOther && targetDate > "2026-11-05" ? " selected" : ""}>Sin deporte</option>
+            <option value="walk-60"${(existingWalk && existingWalk.minutes === 60) || targetDate === "2026-11-05" ? " selected" : ""}>🚶‍♂️ Paseo / Caminata (60m)</option>
+            <option value="walk-45"${(existingWalk && existingWalk.minutes === 45) || (targetDate <= "2026-11-04" && existingWalk) ? " selected" : ""}>🚶‍♂️ Paseo / Caminata (45m)</option>
+            <option value="run-30"${existingOther && existingOther.sport === "correr" ? " selected" : ""}>🏃‍♂️ Running (30m)</option>
+            <option value="futbol-90"${existingOther && (existingOther.sport === "futbol" || existingOther.type === "futbol") ? " selected" : ""}>⚽ Fútbol (90m)</option>
+            <option value="boxeo-60"${existingOther && existingOther.sport === "boxeo" ? " selected" : ""}>🥊 Boxeo (60m)</option>
           </select>
         </label>
       </div>
@@ -519,7 +527,7 @@ export function openAdjustStepsModal(state, targetDate) {
         const raw = inp.value;
         const val = Math.max(0, parseInt(raw, 10) || 0);
         const gymChoice = s.querySelector("#sel-gym")?.value;
-        const walkChoice = s.querySelector("#sel-walk")?.value;
+        const sportChoice = s.querySelector("#sel-sport")?.value;
 
         update(st => {
           let h = st.habits.habits.find(x => x.id === "hb-pasos-salud" || /paso/i.test(x.name || ""));
@@ -532,26 +540,51 @@ export function openAdjustStepsModal(state, targetDate) {
           // Manejar Gimnasio
           st.habits.workouts ||= [];
           if (gymChoice === "descanso" || targetDate === "2026-11-05") {
-            st.habits.workouts = st.habits.workouts.filter(w => !(w.date === targetDate && w.type === "gym" && (!w.sport || w.sport === "gym")));
-          } else if (gymChoice === "entreno") {
-            const hasG = st.habits.workouts.some(w => w.date === targetDate && w.type === "gym" && (!w.sport || w.sport === "gym"));
-            if (!hasG) {
-              st.habits.workouts.push({ id: `wo-gym-${targetDate}`, date: targetDate, type: "gym", sport: "gym", title: "Gimnasio", minutes: 60, exercises: [], note: "Entreno", source: "salud" });
+            st.habits.workouts = st.habits.workouts.filter(w => !(w.date === targetDate && (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym")));
+          } else {
+            const min = parseInt(gymChoice, 10) || 60;
+            const wIdx = st.habits.workouts.findIndex(w => w.date === targetDate && (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym"));
+            if (wIdx >= 0) {
+              st.habits.workouts[wIdx].minutes = min;
+              st.habits.workouts[wIdx].type = "gym";
+              st.habits.workouts[wIdx].sport = "gym";
+            } else {
+              st.habits.workouts.push({ id: `wo-gym-${targetDate}`, date: targetDate, type: "gym", sport: "gym", title: "Gimnasio", minutes: min, exercises: [], note: "Entreno", source: "salud" });
             }
           }
 
-          // Manejar Caminata / Deporte
-          if (walkChoice === "si") {
-            const hasW = st.habits.workouts.some(w => w.date === targetDate && (w.type === "deporte" || w.sport === "andar"));
-            if (!hasW) {
-              st.habits.workouts.push({ id: `wo-walk-${targetDate}`, date: targetDate, type: "deporte", sport: "andar", title: targetDate === "2026-11-05" ? "Caminata al aire libre" : "Paseo / Caminata", minutes: targetDate === "2026-11-05" ? 60 : 45, note: `${val.toLocaleString("es-ES")} pasos`, source: "salud" });
+          // Manejar Deporte / Caminata
+          if (sportChoice === "no") {
+            st.habits.workouts = st.habits.workouts.filter(w => !(w.date === targetDate && (w.type === "deporte" || w.type === "futbol" || (w.sport && w.sport !== "gym"))));
+          } else if (sportChoice.startsWith("walk")) {
+            const min = sportChoice === "walk-60" ? 60 : 45;
+            const wIdx = st.habits.workouts.findIndex(w => w.date === targetDate && (w.type === "deporte" || w.sport === "andar"));
+            if (wIdx >= 0) {
+              st.habits.workouts[wIdx].minutes = min;
+              st.habits.workouts[wIdx].sport = "andar";
+              st.habits.workouts[wIdx].type = "deporte";
+            } else {
+              st.habits.workouts.push({ id: `wo-walk-${targetDate}`, date: targetDate, type: "deporte", sport: "andar", title: targetDate === "2026-11-05" ? "Caminata al aire libre" : "Paseo / Caminata", minutes: min, note: `${val.toLocaleString("es-ES")} pasos`, source: "salud" });
             }
-          } else {
-            st.habits.workouts = st.habits.workouts.filter(w => !(w.date === targetDate && (w.type === "deporte" || w.sport === "andar")));
+          } else if (sportChoice === "run-30") {
+            st.habits.workouts.push({ id: `wo-run-${targetDate}`, date: targetDate, type: "deporte", sport: "correr", title: "Running", minutes: 30, note: "Carrera", source: "salud" });
+          } else if (sportChoice === "futbol-90") {
+            st.habits.workouts.push({ id: `wo-futbol-${targetDate}`, date: targetDate, type: "futbol", sport: "futbol", title: "Fútbol", minutes: 90, note: "Partido", source: "salud" });
+          } else if (sportChoice === "boxeo-60") {
+            st.habits.workouts.push({ id: `wo-box-${targetDate}`, date: targetDate, type: "deporte", sport: "boxeo", title: "Boxeo", minutes: 60, note: "Boxeo", source: "salud" });
           }
         });
         closeSheet();
         toast(`Guardada actividad para ${dateLabel}: ${new Intl.NumberFormat("es-ES").format(val)} pasos`);
+
+        // Actualizar el bento inmediatamente
+        const bento = document.querySelector(".fitness-bento");
+        if (bento) {
+          const tempDiv = document.createElement("div");
+          tempDiv.innerHTML = healthCard(getState());
+          const newBento = tempDiv.firstElementChild;
+          bento.replaceWith(newBento);
+        }
       });
     }
   });
@@ -559,8 +592,8 @@ export function openAdjustStepsModal(state, targetDate) {
 
 // Actualización estática in-place para que el dial y tira no salten al inicio
 function selectFitnessDate(root, newDate) {
-  try { localStorage.setItem("pv_fit_selected_date", newDate); } catch {}
-  fitUI.selectedDate = newDate;
+  try { localStorage.removeItem("pv_fit_selected_date"); } catch {}
+  fitUI.selectedDate = (newDate === iso()) ? null : newDate;
 
   const bento = root.querySelector(".fitness-bento");
   const strip = root.querySelector(".fitness-days-strip");
