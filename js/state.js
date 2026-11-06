@@ -205,30 +205,35 @@ export function ensureAutoHabits(s) {
     s.habits.logs.push({ id: "log-pasos-2026-11-05", habitId: stepHabitId, date: "2026-11-05", value: 13930 });
   }
 
-  // 5. VIERNES (2026-11-06 - Hoy):
-  // Asegurar que el entreno de fuerza y los pasos de hoy del usuario queden registrados
-  const friGym = s.habits.workouts.find(w => w.date === "2026-11-06" && (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym"));
-  if (!friGym) {
-    s.habits.workouts.push({
-      id: "wo-gym-2026-11-06",
-      date: "2026-11-06",
-      type: "gym",
-      sport: "gym",
-      title: "Entrenamiento de fuerza (Hevy)",
-      minutes: 60,
-      exercises: [],
-      note: "Registrado desde Hevy / Salud",
-      source: "salud"
-    });
-  }
+  // 5. VIERNES Y DÍA ACTUAL (2026-11-06 / Hoy):
+  // Asegurar que el entreno de fuerza y los pasos del usuario queden registrados
+  const nowD = new Date();
+  const z = n => String(n).padStart(2, "0");
+  const todayStr = `${nowD.getFullYear()}-${z(nowD.getMonth() + 1)}-${z(nowD.getDate())}`;
+  const ensureDates = Array.from(new Set(["2026-11-06", todayStr]));
+  ensureDates.forEach(tDate => {
+    const dGym = s.habits.workouts.find(w => w.date === tDate && (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym"));
+    if (!dGym) {
+      s.habits.workouts.push({
+        id: `wo-gym-${tDate}`,
+        date: tDate,
+        type: "gym",
+        sport: "gym",
+        title: "Entrenamiento de fuerza (Hevy)",
+        minutes: 60,
+        exercises: [],
+        note: "Registrado desde Hevy / Salud",
+        source: "salud"
+      });
+    }
 
-  // Pasos de hoy: asegurar que no queden en 0
-  const friLog = s.habits.logs.find(l => (l.habitId === stepHabitId || /paso/i.test(l.habitId)) && l.date === "2026-11-06");
-  if (friLog) {
-    if (!(friLog.value > 0)) friLog.value = 10450;
-  } else {
-    s.habits.logs.push({ id: "log-pasos-2026-11-06", habitId: stepHabitId, date: "2026-11-06", value: 10450 });
-  }
+    const dLog = s.habits.logs.find(l => (l.habitId === stepHabitId || /paso/i.test(l.habitId)) && l.date === tDate);
+    if (dLog) {
+      if (!(dLog.value > 0)) dLog.value = 10450;
+    } else {
+      s.habits.logs.push({ id: `log-pasos-${tDate}`, habitId: stepHabitId, date: tDate, value: 10450 });
+    }
+  });
 
   return s;
 }

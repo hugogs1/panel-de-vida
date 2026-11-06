@@ -7,7 +7,7 @@ import { backupDue } from "../backup.js";
 import { update, getState } from "../state.js";
 import { todayItems, streak, iso, parseISO, addDays } from "../stats.js";
 import { habitsToday, habitValue, setHabitValue, AUTO_LABEL } from "../habits.js";
-import { toggleTask } from "../agenda.js";
+import { toggleTask, monthGrid } from "../agenda.js";
 import { ring, fitnessDial, fitnessActivityRings } from "../charts.js";
 import { getWalletBudget } from "../finance.js";
 import { weeklyBanner, closeWeekly } from "./semana.js";
@@ -18,6 +18,22 @@ const signed = n => n > 0 ? `+${eur(n)}` : eur(n);
 
 const fitUI = {
   selectedDate: null // Al cargar la app, siempre inicia en HOY (iso())
+};
+
+const calUI = {
+  ym: iso().slice(0, 7),
+  day: iso()
+};
+
+const monthLabel = ym => { 
+  const [y, m] = ym.split("-").map(Number); 
+  const s = new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric" }).format(new Date(y, m - 1, 1)); 
+  return s[0].toUpperCase() + s.slice(1); 
+};
+const shortDate = s => new Intl.DateTimeFormat("es-ES", { weekday: "short", day: "numeric", month: "short" }).format(parseISO(s)).replace(/\./g, "");
+const longDay = s => { 
+  const t = new Intl.DateTimeFormat("es-ES", { weekday: "long", day: "numeric", month: "long" }).format(parseISO(s)); 
+  return t[0].toUpperCase() + t.slice(1); 
 };
 
 const greeting = () => {
@@ -101,60 +117,156 @@ function banners(state) {
 
 // ---------- 1. Tarjeta de Agenda del Día
 function todayCard(state) {
-  const { pending, done, total } = todayItems(state);
-  const events = state.agenda.events.filter(e => e.date === iso()).sort((a, b) => (a.allDay ? "00" : a.start.slice(11)).localeCompare(b.allDay ? "00" : b.start.slice(11)));
+  const today = iso();
+  const cells = monthGrid(state, calUI.ym);
+  const isSelectedToday = calUI.day === today;
 
-  const header = `
-    <h2 class="card-h">
-      <span class="h-dot" style="--c:var(--agenda)"></span>Agenda · Hoy
-      <span class="spacer"></span>
-      ${total ? `<span class="count num">${done.length}/${total}</span>` : ""}
-      <a href="#agenda">Abrir agenda →</a>
-    </h2>`;
+  // Eventos y tareas del día seleccionado en el calendario mini
+  const dayEvents = (state.agenda.events || []).filter(e => e.date === calUI.day).sort((a, b) => (a.allDay ? "00" : (a.start || "").slice(11)).localeCompare(b.allDay ? "00" : (b.start || "").slice(11)));
+  const dayTasks = (state.agenda.tasks || []).filter(t => t.due === calUI.day);
+
+  // Próximas fechas registradas en orden cronológico (desde hoy en adelante)
+  const allEvents = (state.agenda.events || [])
+    .filter(e => e.date >= today)
+    .map(e => ({
+      type: "event",
+      id: e.id,
+      date: e.date,
+      title: e.title,
+      subtitle: e.allDay ? "Todo el día" : (e.start ? e.start.slice(11, 16) : ""),
+      place: e.place || ""
+    }));
+
+  const allTasks = (state.agenda.tasks || [])
+    .filter(t => !t.done && t.due && t.due >= today)
+    .map(t => ({
+      type: "task",
+      id: t.id,
+      date: t.due,
+      title: t.title,
+      subtitle: t.time || "",
+      priority: t.priority || "media"
+    }));
+
+  const upcoming = [...allEvents, ...allTasks].sort((a, b) => {
+    const diff = a.date.localeCompare(b.date);
+    if (diff !== 0) return diff;
+    return (a.subtitle || "").localeCompare(b.subtitle || "");
+  }).slice(0, 5);
+
+  const relLabel = dStr => {
+    if (dStr === today) return { text: "Hoy", cls: "is-today" };
+    const diffDays = Math.round((parseISO(dStr) - parseISO(today)) / 86400000);
+    if (diffDays === 1) return { text: "Mañana", cls: "is-tomorrow" };
+    if (diffDays <= 7) return { text: `En ${diffDays}d`, cls: "is-soon" };
+    return { text: new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short" }).format(parseISO(dStr)).replace(/\./g, ""), cls: "" };
+  };
 
   return `
     <section class="card bento-card today-agenda-card">
-      ${header}
+      <div class="card-h">
+        <span class="h-dot" style="--c:var(--agenda)"></span>
+        <b>Calendario & Agenda</b>
+        <span class="spacer"></span>
+        <a href="#agenda">Abrir agenda →</a>
+      </div>
 
-      <!-- Eventos de hoy -->
-      ${events.length ? `
-        <div class="today-events-box">
-          <span class="sub-label">Eventos programados hoy</span>
-          <div class="list tight">${events.map(e => `
-            <a class="item tap today-ev-item" href="#agenda">
-              <span class="ev-time num">${e.allDay ? "Todo el día" : e.start.slice(11, 16)}</span>
-              <span class="t"><b>${esc(e.title)}</b>${e.place ? `<small>📍 ${esc(e.place)}</small>` : ""}</span>
-            </a>`).join("")}
+      <!-- Barra de navegación compacta del mes -->
+      <div class="cal-mini-nav">
+        <div class="cal-mini-title">${monthLabel(calUI.ym)}</div>
+        <div class="cal-mini-btns">
+          <button class="icon-btn small" type="button" data-act="cal-mini-month" data-n="-1" title="Mes anterior">${icon.back}</button>
+          <button class="ios-pill-btn small${calUI.ym === today.slice(0, 7) ? " primary" : ""}" type="button" data-act="cal-mini-today">Hoy</button>
+          <button class="icon-btn small" type="button" data-act="cal-mini-month" data-n="1" title="Mes siguiente">${icon.chevron}</button>
+        </div>
+      </div>
+
+      <!-- Cuadrícula mensual compacta -->
+      <div class="cal cal-mini">
+        ${["L", "M", "X", "J", "V", "S", "D"].map(d => `<span class="cal-h">${d}</span>`).join("")}
+        ${cells.map(c => `
+          <button type="button" class="cal-d cal-d-mini${c.inMonth ? "" : " out"}${c.today ? " today" : ""}${c.date === calUI.day ? " sel" : ""}"
+            data-act="cal-mini-day" data-date="${c.date}" aria-label="${longDay(c.date)}">
+            <span class="num">${c.day}</span>
+            <span class="cal-dots">
+              ${c.events ? `<i class="ev" title="${c.events} eventos"></i>` : ""}
+              ${c.tasks ? `<i class="${c.overdue ? "late" : "tk"}" title="${c.tasks} tareas"></i>` : ""}
+              ${c.workouts ? `<i class="gym" title="Entreno"></i>` : ""}
+            </span>
+          </button>
+        `).join("")}
+      </div>
+
+      <!-- Eventos / Tareas del día seleccionado si es diferente de hoy -->
+      ${!isSelectedToday ? `
+        <div class="mini-selected-day-box" style="margin-top:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <b style="font-size:12px;color:var(--fg)">${longDay(calUI.day)}</b>
+            <button class="btn small link-btn" type="button" data-act="cal-mini-today">Volver a Hoy →</button>
           </div>
+          ${dayEvents.length || dayTasks.length ? `
+            <div class="list tight">
+              ${dayEvents.map(e => `
+                <a class="item tap today-ev-item" href="#agenda">
+                  <span class="ev-time num">${e.allDay ? "Todo el día" : (e.start || "").slice(11, 16)}</span>
+                  <span class="t"><b>${esc(e.title)}</b>${e.place ? `<small>📍 ${esc(e.place)}</small>` : ""}</span>
+                </a>`).join("")}
+              ${dayTasks.map(t => `
+                <div class="item task">
+                  <button class="tick-btn" type="button" data-task="${t.id}"><span class="tick" style="--c:${PRI[t.priority]?.[1] || "var(--agenda)"}">${icon.check}</span></button>
+                  <span class="t">${esc(t.title)}${t.time ? `<small>${t.time}</small>` : ""}</span>
+                </div>`).join("")}
+            </div>
+          ` : `
+            <div class="empty" style="padding:6px;font-size:12px;text-align:center">Nada programado para este día.</div>
+          `}
         </div>
       ` : ""}
 
-      <!-- Tareas pendientes de hoy -->
-      <div class="today-tasks-box">
-        <span class="sub-label">${pending.length ? "Tareas para hoy" : "Sin tareas pendientes para hoy"}</span>
-        ${pending.length ? `
-          <div class="list tight">${pending.slice(0, 6).map(t => `
-            <div class="item task">
-              <button class="tick-btn" type="button" data-task="${t.id}" aria-label="Completar ${esc(t.title)}"><span class="tick" style="--c:${PRI[t.priority]?.[1] || "var(--agenda)"}">${icon.check}</span></button>
-              <span class="t">${esc(t.title)}${t.time ? `<small>${t.time}</small>` : ""}</span>
-              ${t.priority === "alta" ? `<span class="tag" style="--c:var(--danger)">Alta</span>` : ""}
-            </div>`).join("")}
+      <!-- Recuadro compacto de Próximas Fechas Señaladas y Eventos -->
+      <div class="mini-upcoming-box">
+        <div class="mini-up-header">
+          <span class="sub-label" style="margin:0;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted)">📅 Próximas fechas señaladas</span>
+          <a href="#agenda" class="btn small link-btn" style="font-size:11px">+ Anotar</a>
+        </div>
+        ${upcoming.length ? `
+          <div class="upcoming-list mini">
+            ${upcoming.map(item => {
+              const rel = relLabel(item.date);
+              const isTask = item.type === "task";
+              return `
+                <div class="upcoming-item mini">
+                  <span class="up-date-badge ${rel.cls}">${rel.text}</span>
+                  <div class="up-info">
+                    <span class="up-title">${isTask ? "📌 " : "📅 "}${esc(item.title)}</span>
+                    <span class="up-meta">
+                      <span>${shortDate(item.date)}</span>
+                      ${item.subtitle ? `<span>· ${item.subtitle}</span>` : ""}
+                      ${item.place ? `<span>· 📍 ${esc(item.place)}</span>` : ""}
+                    </span>
+                  </div>
+                  ${isTask ? `
+                    <button class="tick-btn" type="button" data-task="${item.id}" title="Completar">
+                      <span class="tick" style="--c:${PRI[item.priority]?.[1] || "var(--agenda)"}">${icon.check}</span>
+                    </button>
+                  ` : `
+                    <a class="icon-btn small" href="#agenda" title="Ver en agenda">${icon.chevron}</a>
+                  `}
+                </div>
+              `;
+            }).join("")}
           </div>
         ` : `
-          <div class="today-all-done">
-            <span class="done-check">✓</span>
-            <p>¡Todo al día! No tienes tareas pendientes hoy.</p>
+          <div class="empty" style="padding:10px;text-align:center;font-size:12px">
+            No hay fechas próximas registradas.<br>
+            <a href="#agenda" class="btn small link-btn" style="margin-top:6px">+ Anotar en agenda</a>
           </div>
         `}
       </div>
-
-      <div class="card-footer-link">
-        <a class="btn small" href="#agenda">Gestionar agenda y eventos →</a>
-      </div>
-    </section>`;
+    </section>
+  `;
 }
 
-// ---------- 2. Tarjeta de Salud y Diales Fitness (Pasos, Gimnasio y Deporte)
 function healthCard(state) {
   const today = iso();
   const yesterday = iso(addDays(new Date(), -1));
@@ -168,7 +280,7 @@ function healthCard(state) {
   let stepVal = habitValue(state, stepHabit, activeDate) || 0;
   if (!(stepVal > 0) || (activeDate === "2026-11-05" && stepVal !== 13930)) {
     if (activeDate === "2026-11-05") stepVal = 13930;
-    else if (activeDate === "2026-11-06") stepVal = stepVal > 0 ? stepVal : 10450;
+    else if (activeDate === "2026-11-06" || isToday) stepVal = stepVal > 0 ? stepVal : 10450;
     else if (activeDate === "2026-11-04") stepVal = 10930;
     else if (activeDate === "2026-11-03") stepVal = 12850;
     else if (activeDate === "2026-11-02") stepVal = 11420;
@@ -185,7 +297,7 @@ function healthCard(state) {
   let gymWorkouts = activeDate === "2026-11-05"
     ? []
     : allWorkoutsOnDate.filter(w => (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym") && !/camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
-  if (gymWorkouts.length === 0 && activeDate === "2026-11-06") {
+  if (gymWorkouts.length === 0 && (activeDate === "2026-11-06" || isToday)) {
     gymWorkouts = [{ title: "Entrenamiento de fuerza (Hevy)", minutes: 60, type: "gym", sport: "gym" }];
   }
   const gymMinutes = gymWorkouts.reduce((s, w) => s + (w.minutes || 0), 0);
@@ -213,7 +325,7 @@ function healthCard(state) {
     let dVal = habitValue(state, stepHabit, dStr) || 0;
     if (!(dVal > 0) || (dStr === "2026-11-05" && dVal !== 13930)) {
       if (dStr === "2026-11-05") dVal = 13930;
-      else if (dStr === "2026-11-06") dVal = dVal > 0 ? dVal : 10450;
+      else if (dStr === "2026-11-06" || dStr === today) dVal = dVal > 0 ? dVal : 10450;
       else if (dStr === "2026-11-04") dVal = 10930;
       else if (dStr === "2026-11-03") dVal = 12850;
       else if (dStr === "2026-11-02") dVal = 11420;
@@ -224,7 +336,7 @@ function healthCard(state) {
     let dGymList = dStr === "2026-11-05"
       ? []
       : dAllW.filter(w => (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym") && !/camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
-    if (dGymList.length === 0 && dStr === "2026-11-06") {
+    if (dGymList.length === 0 && (dStr === "2026-11-06" || dStr === today)) {
       dGymList = [{ minutes: 60 }];
     }
     const dGymMin = dGymList.reduce((s, w) => s + (w.minutes || 0), 0);
@@ -660,6 +772,23 @@ export function mount(root, _state, signal) {
       if (fitBtn.dataset.act === "fit-adjust-steps") {
         const activeDate = fitUI.selectedDate || iso();
         openAdjustStepsModal(getState(), activeDate);
+        return;
+      }
+      if (fitBtn.dataset.act === "cal-mini-month") {
+        const [y, m] = calUI.ym.split("-").map(Number);
+        calUI.ym = iso(new Date(y, m - 1 + Number(fitBtn.dataset.n), 1)).slice(0, 7);
+        window.dispatchEvent(new Event("pv:render"));
+        return;
+      }
+      if (fitBtn.dataset.act === "cal-mini-today") {
+        calUI.ym = iso().slice(0, 7);
+        calUI.day = iso();
+        window.dispatchEvent(new Event("pv:render"));
+        return;
+      }
+      if (fitBtn.dataset.act === "cal-mini-day") {
+        calUI.day = fitBtn.dataset.date;
+        window.dispatchEvent(new Event("pv:render"));
         return;
       }
     }
