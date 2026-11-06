@@ -1008,7 +1008,7 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
 }
 @media (max-width: 440px) {
   .fitness-dials-row {
-    gap: 5px;
+    gap: 4px;
   }
 }
 
@@ -1016,10 +1016,10 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   background: rgba(22, 25, 33, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
-  padding: 10px 6px 12px;
+  padding: 8px 5px 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   position: relative;
   overflow: hidden;
   min-width: 0;
@@ -1050,84 +1050,105 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   display: flex;
   justify-content: space-between;
   align-items: center;
+  width: 100%;
   min-width: 0;
-  gap: 4px;
+  gap: 2px;
   padding: 0 2px;
 }
 .fdc-badge {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: .02em;
   color: var(--c);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 .fdc-target {
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
   color: var(--muted);
   white-space: nowrap;
   flex-shrink: 0;
   background: rgba(255, 255, 255, 0.06);
-  padding: 2px 6px;
+  padding: 1px 5px;
   border-radius: 6px;
 }
+
 .fdc-body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
+  width: 100%;
 }
+
+/* El Dial Circular con el texto EXACTAMENTE centrado en el hueco del anillo */
 .fitness-dial {
   position: relative;
   width: 78px;
   height: 78px;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  flex-shrink: 0;
 }
 @media (min-width: 600px) {
   .fitness-dial {
-    width: 88px;
-    height: 88px;
+    width: 86px;
+    height: 86px;
   }
 }
-.fitness-dial svg {
-  transform: rotate(-90deg);
+.fitness-dial svg,
+.fitness-dial .fd-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
-.dial-center-content {
+
+.fitness-dial .fd-content {
   position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  text-align: center;
   pointer-events: none;
+  z-index: 2;
+  box-sizing: border-box;
+  padding: 4px;
 }
-.dial-icon {
+.fitness-dial .fd-icon {
   font-size: 13px;
   line-height: 1;
 }
-.dial-pct {
-  font-size: 13.5px;
+.fitness-dial .fd-pct {
+  font-size: 12.5px;
   font-weight: 800;
-  color: var(--fg);
+  color: #fff;
   line-height: 1.1;
-  margin-top: 2px;
+  margin-top: 1px;
 }
-.dial-sub {
+.fitness-dial .fd-label {
   font-size: 8px;
-  color: var(--muted);
+  color: rgba(255, 255, 255, 0.65);
   font-weight: 700;
   text-align: center;
-  max-width: 64px;
+  max-width: 58px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.1;
+  margin-top: 1px;
 }
 
+/* Métricas inferiores situadas DEBAJO del anillo, separadas por un divisor limpio */
 .fdc-info {
   display: flex;
   flex-direction: column;
@@ -1135,26 +1156,27 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   text-align: center;
   width: 100%;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
-  padding-top: 6px;
+  padding-top: 4px;
+  margin-top: 1px;
   min-width: 0;
 }
 .fdc-main-val {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 800;
   color: var(--fg);
   white-space: nowrap;
   line-height: 1.2;
 }
 .fdc-unit {
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 600;
   color: var(--muted);
 }
 .fdc-sub-val {
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 600;
   color: var(--muted);
-  margin-top: 2px;
+  margin-top: 1px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
