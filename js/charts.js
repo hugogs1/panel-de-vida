@@ -218,6 +218,7 @@ export function fitnessDial({
   const schemes = {
     steps: { from: "#FA114F", to: "#FF5252", track: "rgba(250, 17, 79, 0.16)", glow: "rgba(250, 17, 79, 0.45)" },
     gym: { from: "#A1F524", to: "#2BFB54", track: "rgba(161, 245, 36, 0.16)", glow: "rgba(161, 245, 36, 0.45)" },
+    sport: { from: "#00F0FF", to: "#0A84FF", track: "rgba(0, 240, 255, 0.16)", glow: "rgba(0, 240, 255, 0.45)" },
     stand: { from: "#00F0FF", to: "#0A84FF", track: "rgba(0, 240, 255, 0.16)", glow: "rgba(0, 240, 255, 0.45)" }
   };
   const sc = schemes[kind] || schemes.steps;
@@ -264,15 +265,17 @@ export function fitnessDial({
 export function fitnessActivityRings({
   movePct = 0,
   exercisePct = 0,
+  sportPct,
   standPct = 0,
   size = 144,
   stroke = 12,
   gap = 3
 } = {}) {
+  const activeSportPct = sportPct !== undefined ? sportPct : standPct;
   const rings = [
     { pct: movePct, from: "#FA114F", to: "#FF2442", track: "rgba(250, 17, 79, 0.16)" },
     { pct: exercisePct, from: "#A1F524", to: "#2BFB54", track: "rgba(161, 245, 36, 0.16)" },
-    { pct: standPct, from: "#00F0FF", to: "#0A84FF", track: "rgba(0, 240, 255, 0.16)" }
+    { pct: activeSportPct, from: "#00F0FF", to: "#0A84FF", track: "rgba(0, 240, 255, 0.16)" }
   ];
   const uid = Math.random().toString(36).slice(2, 6);
   let svgPaths = "";

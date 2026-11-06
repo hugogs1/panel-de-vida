@@ -905,7 +905,7 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
 
 
 /* =========================================================
-   Apple Fitness Dials & Activity Rings
+   Apple Fitness Dials & Activity Rings (3 Diales: Pasos, Gym, Deporte)
    ========================================================= */
 .fitness-bento {
   overflow: hidden;
@@ -920,30 +920,33 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: var(--muted);
   border-radius: 9999px;
-  padding: 4px 12px;
-  font-size: 11px;
+  padding: 4px 11px;
+  font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: all 0.2s ease;
+  user-select: none;
 }
 .pill-btn:hover {
   background: rgba(255, 255, 255, 0.12);
-  color: var(--fg);
+  color: #fff;
 }
 .pill-btn.active {
   background: #FA114F;
   border-color: #FA114F;
   color: #fff;
-  box-shadow: 0 2px 12px rgba(250, 17, 79, 0.4);
+  box-shadow: 0 2px 10px rgba(250, 17, 79, 0.4);
 }
 
 .fitness-days-strip {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding: 8px 2px 14px;
+  padding: 8px 4px 14px;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
 }
 .fitness-days-strip::-webkit-scrollbar {
   display: none;
@@ -955,27 +958,28 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   flex-direction: column;
   align-items: center;
   gap: 5px;
-  padding: 8px 10px;
+  padding: 8px 9px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(255, 255, 255, 0.06);
   cursor: pointer;
-  min-width: 54px;
+  min-width: 52px;
   transition: all 0.2s cubic-bezier(.2,.8,.2,1);
   color: inherit;
+  user-select: none;
 }
 .fit-day-chip:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.14);
 }
 .fit-day-chip.selected {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.28);
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(0,0,0,0.4);
 }
 .fit-d-name {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
   color: var(--muted);
   text-transform: uppercase;
@@ -997,28 +1001,35 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
 
 .fitness-dials-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
   margin-top: 6px;
 }
-@media (max-width: 440px) {
+@media (max-width: 480px) {
   .fitness-dials-row {
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
   }
 }
 
 .fitness-dial-card {
   background: rgba(25, 28, 36, 0.65);
   border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 18px;
-  padding: 14px;
+  border-radius: 16px;
+  padding: 12px 8px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   position: relative;
   overflow: hidden;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+@media (max-width: 440px) {
+  .fitness-dial-card {
+    padding: 10px 5px;
+    gap: 6px;
+    border-radius: 14px;
+  }
 }
 .fitness-dial-card::before {
   content: "";
@@ -1028,40 +1039,66 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
 }
 .fitness-dial-card.steps-card { --fd-c: #FA114F; }
 .fitness-dial-card.gym-card { --fd-c: #A1F524; }
+.fitness-dial-card.sport-card { --fd-c: #00F0FF; }
 
 .fdc-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  min-height: 20px;
 }
 .fdc-badge {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: .04em;
+  letter-spacing: .03em;
   color: var(--c);
+  white-space: nowrap;
 }
 .fdc-target {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--muted);
   font-weight: 600;
+  white-space: nowrap;
+}
+.fdc-edit-btn {
+  background: rgba(250, 17, 79, 0.15);
+  border: 1px solid rgba(250, 17, 79, 0.35);
+  color: #FA114F;
+  border-radius: 6px;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  line-height: 1.2;
+}
+.fdc-edit-btn:hover {
+  background: rgba(250, 17, 79, 0.35);
+  transform: scale(1.08);
 }
 
 .fdc-body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 .fitness-dial {
   position: relative;
-  width: 114px;
-  height: 114px;
+  width: 88px;
+  height: 88px;
   display: grid;
   place-items: center;
 }
+@media (max-width: 440px) {
+  .fitness-dial {
+    width: 78px;
+    height: 78px;
+  }
+}
 .fd-svg {
-  filter: drop-shadow(0 4px 12px var(--fd-glow));
+  filter: drop-shadow(0 3px 10px var(--fd-glow));
 }
 .fd-content {
   position: absolute;
@@ -1073,19 +1110,30 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   pointer-events: none;
 }
 .fd-pct {
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 800;
   color: #fff;
   line-height: 1;
   letter-spacing: -.02em;
 }
+@media (max-width: 440px) {
+  .fd-pct {
+    font-size: 16px;
+  }
+  .fdc-badge {
+    font-size: 9px;
+  }
+  .fdc-target {
+    font-size: 9px;
+  }
+}
 .fd-label {
-  font-size: 10px;
+  font-size: 9.5px;
   color: var(--muted);
-  margin-top: 3px;
+  margin-top: 2px;
   font-weight: 700;
   text-align: center;
-  max-width: 90px;
+  max-width: 80px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1096,7 +1144,8 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   justify-content: space-around;
   width: 100%;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
-  padding-top: 10px;
+  padding-top: 7px;
+  gap: 4px;
 }
 .fdc-stat {
   display: flex;
@@ -1105,19 +1154,21 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   min-width: 0;
 }
 .fdc-stat small {
-  font-size: 9px;
+  font-size: 8px;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: .04em;
+  letter-spacing: .03em;
   font-weight: 600;
+  white-space: nowrap;
 }
 .fdc-stat b {
-  font-size: 13px;
+  font-size: 11.5px;
   color: var(--fg);
   margin-top: 2px;
+  white-space: nowrap;
 }
 .truncate {
-  max-width: 90px;
+  max-width: 75px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

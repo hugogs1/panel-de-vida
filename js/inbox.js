@@ -44,6 +44,7 @@ const num = v => {
 function parseDay(v, today) {
   const s = norm(v);
   if (!s || s === "hoy") return today;
+  if (s === "ayer") return iso(addDays(new Date(), -1));
   if (s === "manana") return iso(addDays(new Date(), 1));
   if (["ninguna", "sin fecha", "no"].includes(s)) return null;
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
@@ -103,17 +104,40 @@ export function applyInbox(s, messages, today = iso()) {
       const p = m.proyecto && s.work.projects.find(x => !x.archived && norm(x.name).includes(norm(m.proyecto)));
       s.work.entries.push({ id, date: parseDay(m.fecha, today) || today, minutes, kind, projectId: p?.id || null, note: m.nota || "", source: "siri" });
       done.push(`${minutes >= 60 ? `${String(Math.round(minutes / 6) / 10).replace(".", ",")} h` : `${minutes} min`} de ${kind}`);
-    } else if (tipo === "gimnasio" || tipo === "gym" || tipo === "futbol" || tipo === "entreno") {
+    } else if (tipo === "gimnasio" || tipo === "gym" || tipo === "futbol" || tipo === "entreno" || tipo === "deporte" || tipo === "actividad") {
       const minutes = Math.round(num(m.minutos)) || (tipo === "futbol" ? 90 : 60);
       const date = parseDay(m.fecha, today) || today;
-      const isFutbol = tipo === "futbol" || ["si", "sí", "partido"].includes(norm(m.partido)) || /futbol|fútbol/i.test(m.nombre || "");
+      const rawName = String(m.nombre || m.titulo || m.actividad || (tipo === "gimnasio" || tipo === "gym" ? "Gimnasio" : "Entreno")).trim();
+      const nName = norm(rawName);
+
+      const isWalking = /camin|andar|paseo|walk/i.test(nName);
+      const isRunning = /correr|running|carrera/i.test(nName);
+      const isBoxing = /boxeo|boxing|box/i.test(nName);
+      const isFutbol = tipo === "futbol" || ["si", "sí", "partido"].includes(norm(m.partido)) || /futbol|fútbol/i.test(nName);
+      const isCycling = /bici|ciclism|bike|cycling/i.test(nName);
+      const isGym = tipo === "gimnasio" || tipo === "gym" || /gym|gimnasio|fuerza|pesas|hevy|musculacion|press|sentadilla/i.test(nName);
+
       if (isFutbol) {
-        s.habits.workouts.push({ id, date, type: "futbol", kind: ["si", "sí", "partido"].includes(norm(m.partido)) ? "partido" : "entrenamiento", minutes, note: m.nota || "", source: "salud" });
+        s.habits.workouts.push({ id, date, type: "futbol", sport: "futbol", kind: ["si", "sí", "partido"].includes(norm(m.partido)) ? "partido" : "entrenamiento", minutes, title: "Fútbol", note: m.nota || "", source: "salud" });
         done.push(`fútbol ${minutes} min`);
-      } else {
-        const title = (m.nombre || m.titulo || "Gimnasio").trim();
-        s.habits.workouts.push({ id, date, type: "gym", routineId: null, title, minutes, exercises: [], note: m.nota || "Desde Salud/Hevy", source: "salud" });
+      } else if (isWalking) {
+        s.habits.workouts.push({ id, date, type: "deporte", sport: "andar", title: rawName || "Caminata", minutes, note: m.nota || "Salud/Xiaomi", source: "salud" });
+        done.push(`caminata ${minutes} min`);
+      } else if (isRunning) {
+        s.habits.workouts.push({ id, date, type: "deporte", sport: "correr", title: rawName || "Running", minutes, note: m.nota || "Salud/Xiaomi", source: "salud" });
+        done.push(`running ${minutes} min`);
+      } else if (isBoxing) {
+        s.habits.workouts.push({ id, date, type: "deporte", sport: "boxeo", title: rawName || "Boxeo", minutes, note: m.nota || "Salud/Xiaomi", source: "salud" });
+        done.push(`boxeo ${minutes} min`);
+      } else if (isCycling) {
+        s.habits.workouts.push({ id, date, type: "deporte", sport: "ciclismo", title: rawName || "Ciclismo", minutes, note: m.nota || "Salud/Xiaomi", source: "salud" });
+        done.push(`ciclismo ${minutes} min`);
+      } else if (isGym) {
+        s.habits.workouts.push({ id, date, type: "gym", sport: "gym", routineId: null, title: rawName || "Gimnasio", minutes, exercises: [], note: m.nota || "Hevy/Gimnasio", source: "salud" });
         done.push(`gimnasio ${minutes} min`);
+      } else {
+        s.habits.workouts.push({ id, date, type: "deporte", sport: "actividad", title: rawName || "Actividad deportiva", minutes, note: m.nota || "Salud", source: "salud" });
+        done.push(`${rawName || "actividad"} ${minutes} min`);
       }
     } else if (tipo === "sueno" || tipo === "dormir") {
       const hours = num(m.horas);

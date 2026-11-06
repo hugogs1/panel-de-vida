@@ -108,6 +108,41 @@ export function ensureAutoHabits(s) {
       createdAt: new Date().toISOString().slice(0, 10)
     });
   }
+
+  // Migración y saneamiento: corregir entrenos que se registraron como gym pero eran caminar, correr, boxeo, etc.
+  (s.habits.workouts || []).forEach(w => {
+    const title = (w.title || "") + " " + (w.note || "");
+    if (w.type === "gym" && /camin|andar|paseo|walk/i.test(title)) {
+      w.type = "deporte";
+      w.sport = "andar";
+      if (!w.title || w.title === "Gimnasio") w.title = "Caminata";
+    } else if (w.type === "gym" && /correr|running|carrera/i.test(title)) {
+      w.type = "deporte";
+      w.sport = "correr";
+      if (!w.title || w.title === "Gimnasio") w.title = "Running";
+    } else if (w.type === "gym" && /boxeo|boxing|box/i.test(title)) {
+      w.type = "deporte";
+      w.sport = "boxeo";
+      if (!w.title || w.title === "Gimnasio") w.title = "Boxeo";
+    } else if (w.type === "gym" && /futbol|fútbol/i.test(title)) {
+      w.type = "futbol";
+      w.sport = "futbol";
+      if (!w.title || w.title === "Gimnasio") w.title = "Fútbol";
+    }
+  });
+
+  // Si ayer no tiene pasos registrados o tiene 0, registrar los 13.930 pasos de la sesión de ayer
+  const yDate = new Date();
+  yDate.setDate(yDate.getDate() - 1);
+  const yStr = yDate.toISOString().slice(0, 10);
+  s.habits.logs ||= [];
+  const yLog = s.habits.logs.find(l => (l.habitId === "hb-pasos-salud" || /paso/i.test(l.habitId)) && l.date === yStr);
+  if (!yLog) {
+    s.habits.logs.push({ id: "log-pasos-ayer-init", habitId: "hb-pasos-salud", date: yStr, value: 13930 });
+  } else if (yLog.value === 0) {
+    yLog.value = 13930;
+  }
+
   return s;
 }
 
