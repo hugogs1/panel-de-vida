@@ -104,10 +104,10 @@ export function applyInbox(s, messages, today = iso()) {
       const p = m.proyecto && s.work.projects.find(x => !x.archived && norm(x.name).includes(norm(m.proyecto)));
       s.work.entries.push({ id, date: parseDay(m.fecha, today) || today, minutes, kind, projectId: p?.id || null, note: m.nota || "", source: "siri" });
       done.push(`${minutes >= 60 ? `${String(Math.round(minutes / 6) / 10).replace(".", ",")} h` : `${minutes} min`} de ${kind}`);
-    } else if (tipo === "gimnasio" || tipo === "gym" || tipo === "futbol" || tipo === "entreno" || tipo === "deporte" || tipo === "actividad") {
+    } else if (tipo === "gimnasio" || tipo === "gym" || tipo === "futbol" || tipo === "entreno" || tipo === "deporte" || tipo === "actividad" || tipo === "caminar" || tipo === "andar" || tipo === "paseo" || tipo === "correr") {
       const minutes = Math.round(num(m.minutos)) || (tipo === "futbol" ? 90 : 60);
       const date = parseDay(m.fecha, today) || today;
-      const rawName = String(m.nombre || m.titulo || m.actividad || (tipo === "gimnasio" || tipo === "gym" ? "Gimnasio" : "Entreno")).trim();
+      const rawName = String(m.nombre || m.titulo || m.actividad || (tipo === "caminar" || tipo === "andar" || tipo === "paseo" ? "Caminata" : (tipo === "correr" ? "Running" : (tipo === "gimnasio" || tipo === "gym" ? "Gimnasio" : "Entreno")))).trim();
       const nName = norm(rawName);
 
       const isWalking = /camin|andar|paseo|walk/i.test(nName);

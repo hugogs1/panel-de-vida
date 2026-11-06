@@ -99,8 +99,21 @@ export function buildDemo(alias) {
   }
   for (let i = 14; i >= 0; i--) {
     const day = d(-i);
-    const steps = i === 0 ? 8420 : (i === 1 ? 10650 : Math.round(7200 + r() * 4500));
+    const steps = i === 0 ? 1973 : (i === 1 ? 13930 : (i === 2 ? 10930 : (i === 3 ? 12850 : (i === 4 ? 11420 : Math.round(10000 + r() * 3000)))));
     s.habits.logs.push({ id: nid("l"), habitId: "hb-pasos-salud", date: day, value: steps });
+    // Registrar paseos diarios en deporte
+    if (i <= 5) {
+      s.habits.workouts.push({
+        id: nid("wk"),
+        date: day,
+        type: "deporte",
+        sport: "andar",
+        title: i === 1 ? "Caminata al aire libre" : "Paseo / Caminata",
+        minutes: i === 1 ? 60 : 45 + Math.round(r() * 15),
+        note: `${steps.toLocaleString("es-ES")} pasos (Salud / Xiaomi)`,
+        source: "salud"
+      });
+    }
   }
   s.habits.logs.push({ id: nid("l"), habitId: "hb-agua", date: today, value: 1.5 });
   s.habits.logs.push({ id: nid("l"), habitId: "hb-leer", date: today, value: 10 });

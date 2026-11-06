@@ -115,7 +115,7 @@ function openGuide() {
       `Acción <b>Formatear fecha</b>: Fecha actual, formato personalizado <code>yyyy-MM-dd</code>.`,
       `Acción <b>Texto</b>:` + txt("tipo: pasos\nfecha: [Fecha formateada]\nvalor: [Estadísticas]"),
       send,
-      `La primera vez que lo ejecutes, permite el acceso a Salud.`,
+      `(Recomendado) Puedes duplicar este atajo para "Ayer" con <code>fecha: ayer</code> si tu Xiaomi sincroniza con retraso.`,
       `Pestaña <b>Automatización</b> → <b>+</b> → <b>Hora del día</b> → 23:45, <b>Diariamente</b> → <b>Ejecutar inmediatamente</b> → elige <b>Pasos al Panel</b>.`,
       `En la app aparecerá el hábito <b>Pasos</b> (objetivo 10.000; puedes cambiarlo en Hábitos).`
     ])}
@@ -158,7 +158,8 @@ function openGuide() {
     ${shortcut("12 · Entrenos automáticos de Hevy / Xiaomi a Salud", "", [
       `En <b>Hevy</b>: Perfil → Ajustes → Apple Salud (activa los permisos de escritura de Entrenamientos).`,
       `Crea un atajo <b>Entreno al Panel</b>: <b>Buscar muestras de salud</b> → tipo <b>Entrenamientos</b>, <i>Fecha de inicio</i> <b>es hoy</b>, ordenar por fecha más reciente primero, límite 1.`,
-      `Acción <b>Texto</b>:` + txt("tipo: gimnasio\nminutos: [Duración en minutos del entrenamiento]"),
+      `Acción <b>Texto</b>:` + txt("tipo: entreno\nactividad: [Tipo de actividad del entrenamiento]\nminutos: [Duración en minutos del entrenamiento]"),
+      `El panel detectará automáticamente si es <b>Gimnasio</b> (pesas) o <b>Deporte</b> (caminata, running, fútbol, boxeo) rellenando el círculo correspondiente.`,
       send,
       `Pestaña <b>Automatización</b> → <b>+</b> → <b>Al finalizar un entrenamiento</b> (o a las <b>21:30 Diariamente</b>) → <b>Ejecutar inmediatamente</b> → elige <b>Entreno al Panel</b>.`,
       `Sumará tus minutos, XP y racha de gimnasio automáticamente. Para importar pesos, ejercicios y récords detallados de Hevy, usa <b>Ajustes → Hevy → Importar CSV</b>.`
