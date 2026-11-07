@@ -503,6 +503,23 @@ function healthCard(state) {
         </div>
       </div>
 
+      <!-- Desplegable y selector directo de día -->
+      <div class="fit-dropdown-bar">
+        <label class="fit-dropdown-label" for="fit-day-select">
+          <span style="color:#FA114F">📅</span> Desplegable de días:
+        </label>
+        <select id="fit-day-select" class="fit-dropdown-select input" data-act="fit-dropdown-select" aria-label="Seleccionar día de actividad">
+          ${historyDays.map(d => `
+            <option value="${d.date}"${d.isSelected ? " selected" : ""}>
+              ${d.isToday ? "★ Hoy" : (d.isYesterday ? "Ayer" : (d.isTomorrow ? "Mañana" : d.name))} (${shortDate(d.date)})
+            </option>
+          `).join("")}
+        </select>
+        <button class="pill-btn highlight" type="button" data-act="fit-adjust-steps" title="Ajustar o planificar actividad de este día">
+          ✏️ Ajustar este día
+        </button>
+      </div>
+
       <!-- Tira interactiva de días con 3 mini-anillos concéntricos Apple Fitness (pasados, hoy y todos los siguientes) -->
       <div class="fitness-days-strip">
         ${historyDays.map(d => `
@@ -587,9 +604,24 @@ function healthCard(state) {
       </div>
 
       ${!isToday ? `
-        <div class="fitness-viewing-alert">
-          <span>📍 Viendo ${isFuture ? "día futuro" : "datos de"}: <b>${esc(activeDateLabel)}</b> (${shortDate(activeDate)}) ${isFuture ? "· Toca para planificar actividad" : ""}</span>
-          <button class="btn small link-btn" type="button" data-act="fit-today">Volver a Hoy →</button>
+        <div class="fit-selected-day-panel">
+          <div class="fsd-header">
+            <div class="fsd-info">
+              <span class="fsd-badge ${isFuture ? 'future' : 'past'}">${isFuture ? 'Día futuro' : 'Día anterior'}</span>
+              <b>📍 ${esc(activeDateLabel)} (${shortDate(activeDate)})</b>
+            </div>
+            <div class="fsd-btns" style="display:flex;align-items:center;gap:6px">
+              <button class="btn small primary" type="button" data-act="fit-adjust-steps" style="background:linear-gradient(135deg, #FA114F, #FF2442);border:none;color:#fff;font-weight:700;font-size:11px">
+                ✏️ ${isFuture ? "Planificar entreno" : "Ajustar actividad"}
+              </button>
+              <button class="btn small link-btn" type="button" data-act="fit-today" style="font-size:11px">Volver a Hoy →</button>
+            </div>
+          </div>
+          <div class="fsd-summary-row">
+            <span class="fsd-pill">👟 <b>${num1(stepVal)}</b> pasos (${stepPct}%)</span>
+            <span class="fsd-pill">🏋️ <b>${gymDone ? `${gymMinutes}m` : "0m"}</b> (${gymDone ? gymTitle : "Descanso"})</span>
+            <span class="fsd-pill">⚡ <b>${sportDone ? `${sportMinutes}m` : "0m"}</b> (${sportDone ? sportTitle : "Sin actividad"})</span>
+          </div>
         </div>
       ` : ""}
 
@@ -1034,7 +1066,21 @@ export function openAdjustStepsModal(state, targetDate) {
   });
 }
 
+// Navegación interactiva de fechas de actividad
+function selectFitnessDate(root, newDate) {
+  fitUI.selectedDate = newDate;
+  try { sessionStorage.setItem("pv_fit_selected_date", newDate); } catch {}
+  window.dispatchEvent(new Event("pv:render"));
+}
+
 export function mount(root, _state, signal) {
+  // Escuchar cambios en el desplegable de días
+  root.addEventListener("change", e => {
+    const sel = e.target.closest("[data-act=fit-dropdown-select]");
+    if (sel) {
+      selectFitnessDate(root, sel.value);
+    }
+  }, { signal });
   // Centrar suavemente el chip seleccionado o HOY en la tira interactiva de días
   const strip = root.querySelector(".fitness-days-strip");
   if (strip) {
