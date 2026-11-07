@@ -1066,10 +1066,28 @@ export function openAdjustStepsModal(state, targetDate) {
   });
 }
 
-// Navegación interactiva de fechas de actividad
+// Navegación interactiva de fechas de actividad: actualización 100% estática sin saltos de la barra
 function selectFitnessDate(root, newDate) {
   fitUI.selectedDate = newDate;
   try { sessionStorage.setItem("pv_fit_selected_date", newDate); } catch {}
+
+  const bento = root.querySelector(".fitness-bento") || document.querySelector(".fitness-bento");
+  const strip = bento?.querySelector(".fitness-days-strip");
+  const currentScrollLeft = strip ? strip.scrollLeft : null;
+
+  if (bento) {
+    const tempDiv = document.createElement("div");
+    tempDiv.innerHTML = healthCard(getState());
+    const newBento = tempDiv.firstElementChild;
+    bento.replaceWith(newBento);
+
+    const newStrip = newBento.querySelector(".fitness-days-strip");
+    if (newStrip && currentScrollLeft !== null) {
+      newStrip.scrollLeft = currentScrollLeft;
+    }
+    return;
+  }
+
   window.dispatchEvent(new Event("pv:render"));
 }
 
@@ -1081,16 +1099,16 @@ export function mount(root, _state, signal) {
       selectFitnessDate(root, sel.value);
     }
   }, { signal });
-  // Centrar suavemente el chip seleccionado o HOY en la tira interactiva de días
+
+  // Posicionar la barra solo al cargar inicialmente la app, sin ninguna animación
   const strip = root.querySelector(".fitness-days-strip");
-  if (strip) {
-    requestAnimationFrame(() => {
-      const activeChip = strip.querySelector(".fit-day-chip.selected") || strip.querySelector(".fit-day-chip.is-today");
-      if (activeChip) {
-        const left = activeChip.offsetLeft - (strip.clientWidth - activeChip.clientWidth) / 2;
-        strip.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
-      }
-    });
+  if (strip && !strip.dataset.initScroll) {
+    strip.dataset.initScroll = "true";
+    const activeChip = strip.querySelector(".fit-day-chip.selected") || strip.querySelector(".fit-day-chip.is-today");
+    if (activeChip) {
+      const left = activeChip.offsetLeft - (strip.clientWidth - activeChip.clientWidth) / 2;
+      strip.scrollLeft = Math.max(0, left);
+    }
   }
 
   root.addEventListener("click", e => {

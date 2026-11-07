@@ -945,7 +945,7 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   padding: 8px 4px 14px;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
   overscroll-behavior-x: contain;
 }
 .fitness-days-strip::-webkit-scrollbar {
