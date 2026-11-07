@@ -39,7 +39,7 @@ export function getMonthlyFitnessData(state, ym = iso().slice(0, 7)) {
     // Fallback de seguridad para días conocidos si aún no se han editado
     if (!(val > 0)) {
       if (dStr === "2026-11-05") val = 13930;
-      else if (dStr === "2026-11-06" || dStr === "2026-11-07") val = 10450;
+      else if (dStr === "2026-11-06") val = 10450;
       else if (dStr === "2026-11-04") val = 10930;
       else if (dStr === "2026-11-03") val = 12850;
       else if (dStr === "2026-11-02") val = 11420;
@@ -50,7 +50,7 @@ export function getMonthlyFitnessData(state, ym = iso().slice(0, 7)) {
     let gymList = dStr === "2026-11-05"
       ? []
       : allW.filter(w => (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym") && !/camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
-    if (gymList.length === 0 && (dStr === "2026-11-02" || dStr === "2026-11-03" || dStr === "2026-11-04" || dStr === "2026-11-06" || dStr === "2026-11-07")) {
+    if (gymList.length === 0 && (dStr === "2026-11-02" || dStr === "2026-11-03" || dStr === "2026-11-04" || dStr === "2026-11-06")) {
       gymList = [{ minutes: 60 }];
     }
     const gymMin = gymList.reduce((s, w) => s + (w.minutes || 0), 0);
@@ -379,7 +379,7 @@ function healthCard(state) {
   let stepVal = habitValue(state, stepHabit, activeDate) || 0;
   if (!(stepVal > 0)) {
     if (activeDate === "2026-11-05") stepVal = 13930;
-    else if (activeDate === "2026-11-06" || isToday) stepVal = 10450;
+    else if (activeDate === "2026-11-06") stepVal = 10450;
     else if (activeDate === "2026-11-04") stepVal = 10930;
     else if (activeDate === "2026-11-03") stepVal = 12850;
     else if (activeDate === "2026-11-02") stepVal = 11420;
@@ -396,7 +396,7 @@ function healthCard(state) {
   let gymWorkouts = activeDate === "2026-11-05"
     ? []
     : allWorkoutsOnDate.filter(w => (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym") && !/camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
-  if (gymWorkouts.length === 0 && (activeDate === "2026-11-06" || activeDate === "2026-11-04" || activeDate === "2026-11-03" || activeDate === "2026-11-02" || isToday)) {
+  if (gymWorkouts.length === 0 && (activeDate === "2026-11-06" || activeDate === "2026-11-04" || activeDate === "2026-11-03" || activeDate === "2026-11-02")) {
     gymWorkouts = [{ title: "Entrenamiento de fuerza (Hevy)", minutes: 60, type: "gym", sport: "gym" }];
   }
   const gymMinutes = gymWorkouts.reduce((s, w) => s + (w.minutes || 0), 0);
@@ -429,7 +429,7 @@ function healthCard(state) {
     let dVal = habitValue(state, stepHabit, dStr) || 0;
     if (!(dVal > 0)) {
       if (dStr === "2026-11-05") dVal = 13930;
-      else if (dStr === "2026-11-06" || dStr === today) dVal = 10450;
+      else if (dStr === "2026-11-06") dVal = 10450;
       else if (dStr === "2026-11-04") dVal = 10930;
       else if (dStr === "2026-11-03") dVal = 12850;
       else if (dStr === "2026-11-02") dVal = 11420;
@@ -441,7 +441,7 @@ function healthCard(state) {
     let dGymList = dStr === "2026-11-05"
       ? []
       : dAllW.filter(w => (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym") && !/camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
-    if (dGymList.length === 0 && (dStr === "2026-11-06" || dStr === "2026-11-04" || dStr === "2026-11-03" || dStr === "2026-11-02" || dStr === today)) {
+    if (dGymList.length === 0 && (dStr === "2026-11-06" || dStr === "2026-11-04" || dStr === "2026-11-03" || dStr === "2026-11-02")) {
       dGymList = [{ minutes: 60 }];
     }
     const dGymMin = dGymList.reduce((s, w) => s + (w.minutes || 0), 0);
@@ -911,7 +911,7 @@ export function openAdjustStepsModal(state, targetDate) {
   let currentVal = habitValue(state, stepHabit, targetDate) || 0;
   if (!(currentVal > 0)) {
     if (targetDate === "2026-11-05") currentVal = 13930;
-    else if (targetDate === "2026-11-06" || targetDate === iso()) currentVal = 10450;
+    else if (targetDate === "2026-11-06") currentVal = 10450;
     else if (targetDate === "2026-11-04") currentVal = 10930;
     else if (targetDate === "2026-11-03") currentVal = 12850;
     else if (targetDate === "2026-11-02") currentVal = 11420;
@@ -952,7 +952,7 @@ export function openAdjustStepsModal(state, targetDate) {
           <span style="font-size:12px;color:var(--muted)">🏋️‍♂️ Gimnasio</span>
           <select id="sel-gym" class="input" style="padding:10px;border-radius:10px;font-size:13px;font-weight:600">
             <option value="descanso"${!existingGym && targetDate === "2026-11-05" ? " selected" : ""}>💤 Descanso (0 min)</option>
-            <option value="60"${(existingGym && (existingGym.minutes || 60) === 60 && targetDate !== "2026-11-05") || (!existingGym && targetDate !== "2026-11-05" && isToday) ? " selected" : ""}>🏋️‍♂️ 60 min (Fuerza)</option>
+            <option value="60"${existingGym && (existingGym.minutes || 60) === 60 && targetDate !== "2026-11-05" ? " selected" : ""}>🏋️‍♂️ 60 min (Fuerza)</option>
             <option value="75"${existingGym && existingGym.minutes === 75 ? " selected" : ""}>🏋️‍♂️ 75 min (Fuerza)</option>
             <option value="90"${existingGym && existingGym.minutes === 90 ? " selected" : ""}>🏋️‍♂️ 90 min (Fuerza)</option>
             <option value="45"${existingGym && existingGym.minutes === 45 ? " selected" : ""}>🏋️‍♂️ 45 min (Fuerza)</option>

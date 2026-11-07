@@ -220,32 +220,31 @@ export function ensureAutoHabits(s) {
     }
   });
 
-  // 4. DÍA ACTUAL (Hoy)
+  // 4. LIMPIEZA DEL DÍA ACTUAL (Para que empiece en 0 si no se ha hecho nada)
   const nowD = new Date();
   const z = n => String(n).padStart(2, "0");
   const todayStr = `${nowD.getFullYear()}-${z(nowD.getMonth() + 1)}-${z(nowD.getDate())}`;
 
-  // Asegurar que hoy tenga entreno de gimnasio y pasos
-  const todayGym = s.habits.workouts.find(w => w.date === todayStr && (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym"));
-  if (!todayGym) {
-    s.habits.workouts.push({
-      id: `wo-gym-${todayStr}`,
-      date: todayStr,
-      type: "gym",
-      sport: "gym",
-      title: "Entrenamiento de fuerza (Hevy)",
-      minutes: 60,
-      exercises: [],
-      note: "Registrado desde Hevy / Salud",
-      source: "salud"
-    });
-  }
+  // Si hoy no es un día pasado del historial (es decir, hoy es 2026-11-07 o posterior):
+  // Limpiar cualquier entreno auto-inyectado erróneamente con id automático
+  s.habits.workouts = (s.habits.workouts || []).filter(w => {
+    if (w.date === todayStr && w.id === `wo-gym-${todayStr}` && w.note === "Registrado desde Hevy / Salud") {
+      return false;
+    }
+    if (w.date === "2026-11-07" && w.id === "wo-gym-2026-11-07" && w.note === "Registrado desde Hevy / Salud") {
+      return false;
+    }
+    return true;
+  });
 
+  // Limpiar cualquier log de pasos auto-inyectado de 10450 para hoy si fue creado automáticamente
   const todayLog = s.habits.logs.find(l => (l.habitId === stepHabitId || /paso/i.test(l.habitId)) && l.date === todayStr);
-  if (todayLog) {
-    if (!(todayLog.value > 0)) todayLog.value = 10450;
-  } else {
-    s.habits.logs.push({ id: `log-pasos-${todayStr}`, habitId: stepHabitId, date: todayStr, value: 10450 });
+  if (todayLog && todayLog.id === `log-pasos-${todayStr}` && todayLog.value === 10450) {
+    todayLog.value = 0;
+  }
+  const satLog = s.habits.logs.find(l => (l.habitId === stepHabitId || /paso/i.test(l.habitId)) && l.date === "2026-11-07");
+  if (satLog && satLog.id === "log-pasos-2026-11-07" && satLog.value === 10450) {
+    satLog.value = 0;
   }
 
   return s;
