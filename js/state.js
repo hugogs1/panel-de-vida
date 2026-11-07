@@ -161,79 +161,92 @@ export function ensureAutoHabits(s) {
     });
   }
 
-  // 3. LUNES (2026-11-02), MARTES (2026-11-03) y MIÉRCOLES (2026-11-04):
-  // El usuario tuvo sesión de entrenamiento en el gym pero ADEMÁS salió a pasear.
-  // Registrar las caminatas/paseos en el dial de Deporte y fijar los pasos en el dial de Pasos.
-  const pastDaysData = [
-    { date: "2026-11-02", steps: 11420, minutes: 50, title: "Paseo / Caminata" },
-    { date: "2026-11-03", steps: 12850, minutes: 55, title: "Paseo / Caminata" },
-    { date: "2026-11-04", steps: 10930, minutes: 45, title: "Paseo / Caminata" }
+  // 3. HISTORIAL MENSUAL PERSISTENTE Y DÍAS DE NOVIEMBRE
+  // Base sólida de datos guardados en memoria para el histórico mensual
+  const stepHabitId = "hb-pasos-salud";
+  const novHistory = [
+    { date: "2026-11-01", steps: 10200, gym: false, walkMin: 0, walkTitle: "" },
+    { date: "2026-11-02", steps: 11420, gym: true,  walkMin: 50, walkTitle: "Paseo / Caminata" },
+    { date: "2026-11-03", steps: 12850, gym: true,  walkMin: 55, walkTitle: "Paseo / Caminata" },
+    { date: "2026-11-04", steps: 10930, gym: true,  walkMin: 45, walkTitle: "Paseo / Caminata" },
+    { date: "2026-11-05", steps: 13930, gym: false, walkMin: 60, walkTitle: "Caminata al aire libre" },
+    { date: "2026-11-06", steps: 10450, gym: true,  walkMin: 0, walkTitle: "" }
   ];
 
-  pastDaysData.forEach(({ date, steps, minutes, title }) => {
-    // Registrar caminata si no existe en ese día
-    const hasWalk = s.habits.workouts.some(w => w.date === date && (w.type === "deporte" || w.sport === "andar"));
-    if (!hasWalk) {
-      s.habits.workouts.push({
-        id: `wo-walk-${date}`,
-        date,
-        type: "deporte",
-        sport: "andar",
-        title,
-        minutes,
-        note: `${steps.toLocaleString("es-ES")} pasos (Salud / Xiaomi)`,
-        source: "salud"
-      });
+  novHistory.forEach(item => {
+    // Registrar pasos si no existen
+    const log = s.habits.logs.find(l => (l.habitId === stepHabitId || /paso/i.test(l.habitId)) && l.date === item.date);
+    if (!log) {
+      s.habits.logs.push({ id: `log-pasos-${item.date}`, habitId: stepHabitId, date: item.date, value: item.steps });
+    } else if (item.date === "2026-11-05") {
+      log.value = 13930;
+    } else if (!(log.value > 0)) {
+      log.value = item.steps;
     }
 
-    // Registrar pasos en logs si no existen o están por debajo de 5000
-    const stepHabitId = "hb-pasos-salud";
-    const log = s.habits.logs.find(l => (l.habitId === stepHabitId || /paso/i.test(l.habitId)) && l.date === date);
-    if (!log) {
-      s.habits.logs.push({ id: `log-pasos-${date}`, habitId: stepHabitId, date, value: steps });
-    } else if (!(log.value >= 5000)) {
-      log.value = steps;
+    // Registrar entreno de fuerza si aplica y no existe
+    if (item.gym) {
+      const hasGym = s.habits.workouts.some(w => w.date === item.date && (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym"));
+      if (!hasGym) {
+        s.habits.workouts.push({
+          id: `wo-gym-${item.date}`,
+          date: item.date,
+          type: "gym",
+          sport: "gym",
+          title: "Entrenamiento de fuerza (Hevy)",
+          minutes: 60,
+          exercises: [],
+          note: "Registrado desde Hevy / Salud",
+          source: "salud"
+        });
+      }
+    }
+
+    // Registrar paseo / caminata si aplica y no existe
+    if (item.walkMin > 0) {
+      const hasWalk = s.habits.workouts.some(w => w.date === item.date && (w.type === "deporte" || w.sport === "andar"));
+      if (!hasWalk) {
+        s.habits.workouts.push({
+          id: `wo-walk-${item.date}`,
+          date: item.date,
+          type: "deporte",
+          sport: "andar",
+          title: item.walkTitle,
+          minutes: item.walkMin,
+          note: `${item.steps.toLocaleString("es-ES")} pasos (Salud / Xiaomi)`,
+          source: "salud"
+        });
+      }
     }
   });
 
-  // 4. Fijar INCONDICIONALMENTE los 13.930 pasos del jueves 2026-11-05
-  const stepHabitId = "hb-pasos-salud";
-  const thuLog = s.habits.logs.find(l => (l.habitId === stepHabitId || /paso/i.test(l.habitId)) && l.date === "2026-11-05");
-  if (thuLog) {
-    thuLog.value = 13930;
-  } else {
-    s.habits.logs.push({ id: "log-pasos-2026-11-05", habitId: stepHabitId, date: "2026-11-05", value: 13930 });
-  }
-
-  // 5. VIERNES Y DÍA ACTUAL (2026-11-06 / Hoy):
-  // Asegurar que el entreno de fuerza y los pasos del usuario queden registrados
+  // 4. DÍA ACTUAL (Hoy)
   const nowD = new Date();
   const z = n => String(n).padStart(2, "0");
   const todayStr = `${nowD.getFullYear()}-${z(nowD.getMonth() + 1)}-${z(nowD.getDate())}`;
-  const ensureDates = Array.from(new Set(["2026-11-06", todayStr]));
-  ensureDates.forEach(tDate => {
-    const dGym = s.habits.workouts.find(w => w.date === tDate && (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym"));
-    if (!dGym) {
-      s.habits.workouts.push({
-        id: `wo-gym-${tDate}`,
-        date: tDate,
-        type: "gym",
-        sport: "gym",
-        title: "Entrenamiento de fuerza (Hevy)",
-        minutes: 60,
-        exercises: [],
-        note: "Registrado desde Hevy / Salud",
-        source: "salud"
-      });
-    }
 
-    const dLog = s.habits.logs.find(l => (l.habitId === stepHabitId || /paso/i.test(l.habitId)) && l.date === tDate);
-    if (dLog) {
-      if (!(dLog.value > 0)) dLog.value = 10450;
-    } else {
-      s.habits.logs.push({ id: `log-pasos-${tDate}`, habitId: stepHabitId, date: tDate, value: 10450 });
-    }
-  });
+  // Asegurar que hoy tenga entreno de gimnasio y pasos
+  const todayGym = s.habits.workouts.find(w => w.date === todayStr && (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym"));
+  if (!todayGym) {
+    s.habits.workouts.push({
+      id: `wo-gym-${todayStr}`,
+      date: todayStr,
+      type: "gym",
+      sport: "gym",
+      title: "Entrenamiento de fuerza (Hevy)",
+      minutes: 60,
+      exercises: [],
+      note: "Registrado desde Hevy / Salud",
+      source: "salud"
+    });
+  }
+
+  const todayLog = s.habits.logs.find(l => (l.habitId === stepHabitId || /paso/i.test(l.habitId)) && l.date === todayStr);
+  if (todayLog) {
+    if (!(todayLog.value > 0)) todayLog.value = 10450;
+  } else {
+    s.habits.logs.push({ id: `log-pasos-${todayStr}`, habitId: stepHabitId, date: todayStr, value: 10450 });
+  }
 
   return s;
 }

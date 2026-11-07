@@ -1843,3 +1843,203 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
 .upcoming-item.mini .up-meta {
   font-size: 10px;
 }
+
+
+/* ===============================================
+   RESUMEN MENSUAL DE FITNESS Y TIRAS DE DÍAS SIGUIENTES
+=============================================== */
+.pill-btn.highlight {
+  background: linear-gradient(135deg, rgba(250, 17, 79, 0.2), rgba(255, 36, 66, 0.3));
+  border-color: rgba(250, 17, 79, 0.45);
+  color: #fff;
+  font-weight: 700;
+}
+.pill-btn.highlight:hover {
+  background: linear-gradient(135deg, rgba(250, 17, 79, 0.35), rgba(255, 36, 66, 0.5));
+  border-color: #FA114F;
+}
+.pill-btn.nav-arrow {
+  padding: 3px 8px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.fit-day-chip.is-future {
+  opacity: 0.65;
+  border-style: dashed;
+}
+.fit-day-chip.is-future:hover {
+  opacity: 0.95;
+  border-style: solid;
+}
+.fit-day-chip.is-today {
+  border-color: rgba(250, 17, 79, 0.5);
+  box-shadow: 0 0 10px rgba(250, 17, 79, 0.15);
+}
+
+/* Modal / Sheet Resumen Mensual */
+.monthly-fit-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.mf-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.mf-title-box {
+  text-align: center;
+}
+
+.mf-kpi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 420px) {
+  .mf-kpi-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+}
+
+.mf-kpi-card {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 2px solid var(--c, #FA114F);
+}
+.mf-kpi-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mf-kpi-icon {
+  font-size: 14px;
+}
+.mf-kpi-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.mf-kpi-val {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--fg);
+  margin-top: 4px;
+  line-height: 1.1;
+}
+.mf-kpi-sub {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.3;
+}
+.mf-kpi-progress {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  margin-top: 8px;
+  overflow: hidden;
+}
+.mf-kpi-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--c, #FA114F);
+  transition: width 0.3s ease;
+}
+.mf-kpi-meta {
+  font-size: 9.5px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* Calendario Mensual de Actividad */
+.mf-cal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 12px 10px;
+}
+.mf-cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+.mf-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+.mf-cal-dow {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--muted);
+  text-align: center;
+  padding-bottom: 4px;
+}
+.mf-cal-empty {
+  min-height: 44px;
+}
+.mf-cal-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  padding: 4px 2px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.mf-cal-cell:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
+}
+.mf-cal-cell.is-today {
+  border-color: #FA114F;
+  box-shadow: 0 0 8px rgba(250, 17, 79, 0.25);
+}
+.mf-cal-cell.is-future {
+  opacity: 0.55;
+  border-style: dashed;
+}
+.mf-cal-day-num {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--fg);
+  line-height: 1;
+}
+.mf-cal-rings {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+}
+
+.mf-storage-info {
+  background: rgba(161, 245, 36, 0.06);
+  border: 1px solid rgba(161, 245, 36, 0.18);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--fg);
+  line-height: 1.4;
+}
