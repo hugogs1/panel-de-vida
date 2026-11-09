@@ -2060,17 +2060,19 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
 }
 
 
-/* Desplegable de días y panel de detalle del día seleccionado */
+/* Desplegable de días y panel de detalle del día seleccionado (alto contraste y 100% alineado) */
 .fit-dropdown-bar {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 6px 0 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  margin: 6px 0 8px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   padding: 6px 10px;
-  flex-wrap: wrap;
+  width: 100%;
+  box-sizing: border-box;
+  flex-wrap: nowrap;
 }
 .fit-dropdown-label {
   font-size: 11.5px;
@@ -2078,80 +2080,152 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   color: var(--muted);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .fit-dropdown-select {
   flex: 1;
-  min-width: 180px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  font-size: 12.5px;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: 9px;
+  font-size: 12px;
   font-weight: 700;
-  background-color: #1a1d27 !important;
-  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  background-color: #161822 !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
   color: #ffffff !important;
   color-scheme: dark !important;
   cursor: pointer;
   outline: none;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
   transition: border-color .15s ease, box-shadow .15s ease;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
 }
 .fit-dropdown-select:focus {
   border-color: #FA114F !important;
-  box-shadow: 0 0 0 2px rgba(250, 17, 79, 0.3);
+  box-shadow: 0 0 0 2px rgba(250, 17, 79, 0.35);
 }
 .fit-dropdown-select option {
-  background-color: #1a1d27 !important;
+  background-color: #161822 !important;
   color: #ffffff !important;
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 600;
 }
+.fit-dropdown-adjust-btn {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  padding: 6px 10px;
+  white-space: nowrap;
+  border-radius: 8px;
+}
 
-/* Barra de navegación de semanas en los círculos */
+/* Barra de navegación de semanas: perfectamente alineada en 1 sola fila con flechas al final */
 .fit-week-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin: 4px 0 6px;
-  padding: 4px 2px;
-  flex-wrap: wrap;
+  margin: 6px 0 8px;
+  padding: 0 2px;
+  width: 100%;
+  box-sizing: border-box;
+  flex-wrap: nowrap;
 }
-.fit-week-info {
+.fit-week-title-wrap {
+  min-width: 0;
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: 6px;
+  overflow: hidden;
 }
 .fit-week-badge {
   font-size: 12px;
   font-weight: 700;
-  color: #fff;
+  color: #ffffff;
   letter-spacing: -.01em;
   background: rgba(255, 255, 255, 0.05);
-  padding: 3px 8px;
+  padding: 4px 10px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  max-width: 100%;
 }
-.fit-week-actions {
+.fit-week-controls {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
-.nav-week-btn {
+.nav-week-today-btn {
   font-size: 11px;
   padding: 4px 10px;
   font-weight: 700;
   border-radius: 9999px;
+  white-space: nowrap;
+}
+.nav-week-arrow-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 800;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   color: var(--fg);
   cursor: pointer;
   transition: all .15s ease;
+  user-select: none;
 }
-.nav-week-btn:hover {
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
+.nav-week-arrow-btn:hover,
+.nav-week-arrow-btn:active {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: scale(1.04);
+}
+
+@media (max-width: 480px) {
+  .fit-dropdown-bar {
+    gap: 6px;
+    padding: 5px 8px;
+  }
+  .fit-dropdown-label .fit-dd-lbl-text {
+    display: none;
+  }
+  .fit-dropdown-select {
+    font-size: 11px;
+    padding: 6px 8px;
+  }
+  .fit-dropdown-adjust-btn {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+  .fit-dropdown-adjust-btn .fit-btn-full {
+    display: none;
+  }
+  .fit-week-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+  .nav-week-arrow-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 15px;
+  }
+  .nav-week-today-btn {
+    font-size: 10.5px;
+    padding: 3px 8px;
+  }
 }
 
 /* 7 Días de la semana en cuadrícula adaptable perfecta */

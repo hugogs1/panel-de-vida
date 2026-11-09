@@ -528,10 +528,10 @@ function healthCard(state) {
         </div>
       </div>
 
-      <!-- Desplegable y selector directo de día (alto contraste y legible) -->
+      <!-- Desplegable y selector directo de día (alto contraste y 100% alineado) -->
       <div class="fit-dropdown-bar">
         <label class="fit-dropdown-label" for="fit-day-select">
-          <span style="color:#FA114F">📅</span> Seleccionar día:
+          <span style="color:#FA114F">📅</span> <span class="fit-dd-lbl-text">Seleccionar día:</span>
         </label>
         <select id="fit-day-select" class="fit-dropdown-select" data-act="fit-dropdown-select" aria-label="Seleccionar día de actividad">
           ${dropdownDays.map(d => `
@@ -540,28 +540,24 @@ function healthCard(state) {
             </option>
           `).join("")}
         </select>
-        <button class="pill-btn highlight" type="button" data-act="fit-adjust-steps" title="Ajustar o planificar actividad de este día">
-          ✏️ Ajustar este día
+        <button class="pill-btn highlight fit-dropdown-adjust-btn" type="button" data-act="fit-adjust-steps" title="Ajustar o planificar actividad de este día">
+          ✏️ <span class="fit-btn-full">Ajustar día</span>
         </button>
       </div>
 
-      <!-- Barra de navegación semanal de los círculos -->
+      <!-- Barra de navegación semanal de los círculos (perfectamente alineada, flechas al final) -->
       <div class="fit-week-bar">
-        <button class="pill-btn nav-week-btn" type="button" data-act="fit-prev-week" title="Semana anterior">
-          ‹ Sem. anterior
-        </button>
-        <div class="fit-week-info">
+        <div class="fit-week-title-wrap">
           <span class="fit-week-badge">📅 ${weekTitle}</span>
         </div>
-        <div class="fit-week-actions">
+        <div class="fit-week-controls">
           ${!isCurrentWeek ? `
-            <button class="pill-btn highlight nav-week-btn" type="button" data-act="fit-current-week" title="Volver a esta semana">
-              ★ Esta semana
+            <button class="pill-btn highlight nav-week-today-btn" type="button" data-act="fit-current-week" title="Volver a esta semana">
+              ★ Hoy
             </button>
           ` : ""}
-          <button class="pill-btn nav-week-btn" type="button" data-act="fit-next-week" title="Semana siguiente">
-            Sem. siguiente ›
-          </button>
+          <button class="nav-week-arrow-btn" type="button" data-act="fit-prev-week" title="Semana anterior" aria-label="Semana anterior">‹</button>
+          <button class="nav-week-arrow-btn" type="button" data-act="fit-next-week" title="Semana siguiente" aria-label="Semana siguiente">›</button>
         </div>
       </div>
 
@@ -1350,6 +1346,34 @@ export function mount(root, _state, signal) {
       selectFitnessDate(root, sel.value);
     }
   }, { signal });
+
+  // Soporte de gesto swipe táctil en la tira de círculos para pasar de semana deslizando
+  let touchStartX = 0;
+  let touchStartY = 0;
+  root.addEventListener("touchstart", e => {
+    const strip = e.target.closest(".fitness-days-strip.weekly-mode");
+    if (!strip) return;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true, signal });
+
+  root.addEventListener("touchend", e => {
+    const strip = e.target.closest(".fitness-days-strip.weekly-mode");
+    if (!strip) return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx < 0) {
+        // Deslizar hacia la izquierda -> Semana siguiente
+        const cur = fitUI.selectedDate || iso();
+        selectFitnessDate(root, iso(addDays(parseISO(cur), 7)));
+      } else {
+        // Deslizar hacia la derecha -> Semana anterior
+        const cur = fitUI.selectedDate || iso();
+        selectFitnessDate(root, iso(addDays(parseISO(cur), -7)));
+      }
+    }
+  }, { passive: true, signal });
 
   // Posicionar la barra solo al cargar inicialmente la app, sin ninguna animación
   const strip = root.querySelector(".fitness-days-strip");
