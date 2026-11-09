@@ -12,6 +12,8 @@ import { applyInbox } from "./inbox.js";
 import { paintSyncStatus, askConflict } from "./views/sync-ui.js";
 import { requestPersistence } from "./db.js";
 import { toast, closeSheet } from "./ui.js";
+import { setHabitValue } from "./habits.js";
+import { iso } from "./stats.js";
 import * as resumen from "./views/resumen.js";
 import * as finanzas from "./views/finanzas.js";
 import * as habitos from "./views/habitos.js";
@@ -63,6 +65,103 @@ function render({ scrollTop = false } = {}) {
   if (changed || scrollTop) window.scrollTo(0, 0);
 }
 
+
+// Sincronización instantánea directa mediante hash URL (para Atajos de iOS / enlaces directos)
+function handleDirectSync() {
+  const hash = location.hash;
+  if (!hash.startsWith("#sync")) return false;
+
+  const qIdx = hash.indexOf("?");
+  if (qIdx >= 0) {
+    const params = new URLSearchParams(hash.slice(qIdx));
+    let rawFecha = params.get("fecha") || params.get("date") || "hoy";
+    let fecha = iso();
+    if (rawFecha === "ayer") {
+      const d = new Date(); d.setDate(d.getDate() - 1);
+      fecha = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    } else if (/^\d{4}-\d{2}-\d{2}/.test(rawFecha)) {
+      fecha = rawFecha.slice(0, 10);
+    }
+
+    const pasos = parseInt(params.get("pasos") || params.get("steps") || "0", 10);
+    const gymMin = parseInt(params.get("gym") || params.get("fuerza") || "0", 10);
+    const gymTitle = params.get("gym_title") || "Entrenamiento de fuerza (Hevy)";
+    const deporte = params.get("deporte") || params.get("sport") || "";
+    const deporteMin = parseInt(params.get("deporte_min") || params.get("minutos") || "0", 10);
+    const batchJson = params.get("batch") || params.get("lote") || "";
+
+    update(s => {
+      if (batchJson) {
+        try {
+          const items = JSON.parse(decodeURIComponent(batchJson));
+          if (Array.isArray(items)) {
+            applyInbox(s, [{ name: `sync-batch-${Date.now()}`, text: JSON.stringify(items) }]);
+          }
+        } catch (e) {
+          console.warn("Error al procesar lote JSON de URL", e);
+        }
+      }
+
+      if (pasos > 0) {
+        let h = s.habits.habits.find(x => x.id === "hb-pasos-salud" || /paso/i.test(x.name || ""));
+        if (!h) {
+          h = { id: "hb-pasos-salud", name: "Pasos", unit: "pasos", target: 10000, step: 1000, frequency: { type: "daily" }, source: "salud", archived: false, createdAt: iso() };
+          s.habits.habits.push(h);
+        }
+        setHabitValue(s, h.id, fecha, pasos);
+      }
+
+      if (gymMin > 0) {
+        s.habits.workouts ||= [];
+        const existing = s.habits.workouts.find(w => w.date === fecha && (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym"));
+        if (existing) {
+          existing.minutes = gymMin;
+          existing.title = gymTitle;
+          existing.source = "salud";
+        } else {
+          s.habits.workouts.push({
+            id: `wo-gym-${fecha}-${Date.now().toString(36)}`,
+            date: fecha,
+            type: "gym",
+            sport: "gym",
+            title: gymTitle,
+            minutes: gymMin,
+            exercises: [],
+            note: "Sincronizado vía URL / Atajo",
+            source: "salud"
+          });
+        }
+      }
+
+      if (deporte && deporteMin > 0) {
+        s.habits.workouts ||= [];
+        const sportKind = /camin|andar|paseo|walk/i.test(deporte) ? "andar" : (/correr|running/i.test(deporte) ? "correr" : (/futbol/i.test(deporte) ? "futbol" : "actividad"));
+        const existing = s.habits.workouts.find(w => w.date === fecha && (w.type === "deporte" || w.sport === sportKind));
+        if (existing) {
+          existing.minutes = deporteMin;
+          existing.source = "salud";
+        } else {
+          s.habits.workouts.push({
+            id: `wo-sport-${fecha}-${Date.now().toString(36)}`,
+            date: fecha,
+            type: sportKind === "futbol" ? "futbol" : "deporte",
+            sport: sportKind,
+            title: deporte,
+            minutes: deporteMin,
+            note: "Sincronizado vía URL / Atajo",
+            source: "salud"
+          });
+        }
+      }
+    });
+
+    toast(`✅ Sincronizados datos de fitness para ${fecha}`, { ms: 4000 });
+    history.replaceState(null, "", "#resumen");
+    return true;
+  }
+  return false;
+}
+
 async function start() {
   await loadState();
   // Categorías por defecto y gastos fijos que hayan vencido desde la última vez
@@ -70,7 +169,10 @@ async function start() {
   initQuickAdd();
   // Las vistas pueden pedir repintarse al cambiar su estado interno (pestaña, mes…)
   window.addEventListener("pv:render", () => { const y = window.scrollY; render(); window.scrollTo(0, y); });
-  window.addEventListener("hashchange", () => render({ scrollTop: true }));
+  window.addEventListener("hashchange", () => {
+    if (handleDirectSync()) return;
+    render({ scrollTop: true });
+  });
   // Al cambiar los datos, se vuelve a pintar la pantalla actual sin mover el scroll
   // y se recalcula la XP: si sube de nivel o desbloquea un logro, se celebra
   subscribe(state => {
@@ -82,6 +184,7 @@ async function start() {
     window.scrollTo(0, y);
     if (!silent) { xpPop(gained); celebrate(events); }
   });
+  handleDirectSync();
   render();
   requestPersistence();
   initShortcuts();

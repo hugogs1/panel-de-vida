@@ -63,14 +63,53 @@ export function applyInbox(s, messages, today = iso()) {
   s.inboxSeen ||= [];
   const seen = new Set(s.inboxSeen);
 
-  for (const { name, text } of messages) {
-    const m = parseMessage(text);
+  // Desempaquetar lotes JSON si llegan como array
+  const expanded = [];
+  for (const msg of messages) {
+    const trimmed = String(msg.text || "").trim();
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const arr = JSON.parse(trimmed);
+        if (Array.isArray(arr)) {
+          arr.forEach((item, idx) => {
+            const lines = Object.entries(item).map(([k, v]) => `${k}: ${v}`).join("\n");
+            expanded.push({ name: `${msg.name}-item${idx}`, text: lines });
+          });
+          continue;
+        }
+      } catch (err) { /* si falla, se procesa como texto estándar */ }
+    }
+    expanded.push(msg);
+  }
+
+  for (const { name, text } of expanded) {
     const hash = (str => { let h = 0; for (let i = 0; i < str.length; i++) { h = ((h << 5) - h) + str.charCodeAt(i); h |= 0; } return (h >>> 0).toString(36); })(text || "");
     const id = `ibx-${name.replace(/\.[a-z]+$/i, "")}-${hash}`;
-    const tipo = norm(m.tipo);
     if (seen.has(id)) continue;      // ya procesado (en este u otro dispositivo)
     seen.add(id);
     s.inboxSeen.push(id);
+
+    // Soporte para lote de pasos multifecha en un solo mensaje: YYYY-MM-DD: <pasos>
+    const dateMatches = [...String(text || "").matchAll(/(\d{4}-\d{2}-\d{2})\s*[:=]\s*([\d.,]+)/g)];
+    if (dateMatches.length > 1) {
+      let h = s.habits.habits.find(x => x.id === STEPS_HABIT_ID);
+      if (!h) {
+        h = { id: STEPS_HABIT_ID, name: "Pasos", unit: "pasos", target: 10000, step: 1000, frequency: { type: "daily" }, source: "salud", archived: false, createdAt: today };
+        s.habits.habits.push(h);
+      }
+      for (const match of dateMatches) {
+        const d = match[1];
+        const v = Math.round(num(match[2]));
+        if (v > 0) {
+          setHabitValue(s, h.id, d, v);
+          done.push(`${d}: ${int(v)} pasos`);
+        }
+      }
+      continue;
+    }
+
+    const m = parseMessage(text);
+    const tipo = norm(m.tipo);
 
     if (tipo === "gasto" || tipo === "ingreso") {
       const value = Math.abs(num(m.importe));
@@ -133,7 +172,14 @@ export function applyInbox(s, messages, today = iso()) {
         s.habits.workouts.push({ id, date, type: "deporte", sport: "ciclismo", title: rawName || "Ciclismo", minutes, note: m.nota || "Salud/Xiaomi", source: "salud" });
         done.push(`ciclismo ${minutes} min`);
       } else if (isGym) {
-        s.habits.workouts.push({ id, date, type: "gym", sport: "gym", routineId: null, title: rawName || "Gimnasio", minutes, exercises: [], note: m.nota || "Hevy/Gimnasio", source: "salud" });
+        const existing = s.habits.workouts.find(w => w.date === date && (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym"));
+        if (existing) {
+          existing.minutes = minutes;
+          if (rawName && rawName !== "Gimnasio") existing.title = rawName;
+          existing.source = "salud";
+        } else {
+          s.habits.workouts.push({ id, date, type: "gym", sport: "gym", routineId: null, title: rawName || "Gimnasio", minutes, exercises: [], note: m.nota || "Hevy/Gimnasio", source: "salud" });
+        }
         done.push(`gimnasio ${minutes} min`);
       } else {
         s.habits.workouts.push({ id, date, type: "deporte", sport: "actividad", title: rawName || "Actividad deportiva", minutes, note: m.nota || "Salud", source: "salud" });

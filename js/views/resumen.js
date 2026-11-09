@@ -5,6 +5,8 @@ import { esc, int, money as eur, longDate, monthName, toast, openSheet, closeShe
 import { icon } from "../icons.js";
 import { backupDue } from "../backup.js";
 import { update, getState } from "../state.js";
+import { syncConfigured, syncNow, getSyncStatus, statusText } from "../sync.js";
+import { parseHevy, applyHevy } from "../hevy.js";
 import { todayItems, streak, iso, parseISO, addDays } from "../stats.js";
 import { habitsToday, habitValue, setHabitValue, AUTO_LABEL } from "../habits.js";
 import { toggleTask, monthGrid } from "../agenda.js";
@@ -34,32 +36,14 @@ export function getMonthlyFitnessData(state, ym = iso().slice(0, 7)) {
   const days = [];
   for (let d = 1; d <= daysInMonth; d++) {
     const dStr = `${ym}-${String(d).padStart(2, "0")}`;
-    let val = habitValue(state, stepHabit, dStr) || 0;
-    
-    // Fallback de seguridad para días conocidos si aún no se han editado
-    if (!(val > 0)) {
-      if (dStr === "2026-11-05") val = 13930;
-      else if (dStr === "2026-11-06") val = 10450;
-      else if (dStr === "2026-11-04") val = 10930;
-      else if (dStr === "2026-11-03") val = 12850;
-      else if (dStr === "2026-11-02") val = 11420;
-      else if (dStr === "2026-11-01") val = 10200;
-    }
+    const val = habitValue(state, stepHabit, dStr) || 0;
 
     const allW = (state.habits.workouts || []).filter(w => w.date === dStr);
-    let gymList = dStr === "2026-11-05"
-      ? []
-      : allW.filter(w => (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym") && !/camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
-    if (gymList.length === 0 && (dStr === "2026-11-02" || dStr === "2026-11-03" || dStr === "2026-11-04" || dStr === "2026-11-06")) {
-      gymList = [{ minutes: 60 }];
-    }
+    const gymList = allW.filter(w => (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym") && !/camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
     const gymMin = gymList.reduce((s, w) => s + (w.minutes || 0), 0);
     const gymDone = gymList.length > 0;
 
-    let sportList = allW.filter(w => w.type === "deporte" || w.type === "futbol" || (w.sport && w.sport !== "gym") || /camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
-    if (sportList.length === 0 && (dStr === "2026-11-05" || dStr === "2026-11-04" || dStr === "2026-11-03" || dStr === "2026-11-02")) {
-      sportList = [{ minutes: dStr === "2026-11-05" ? 60 : (dStr === "2026-11-03" ? 55 : (dStr === "2026-11-02" ? 50 : 45)) }];
-    }
+    const sportList = allW.filter(w => w.type === "deporte" || w.type === "futbol" || (w.sport && w.sport !== "gym") || /camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
     const sportMin = sportList.reduce((s, w) => s + (w.minutes || 0), 0);
     const sportDone = sportList.length > 0;
 
@@ -373,18 +357,10 @@ function healthCard(state) {
   const isTomorrow = activeDate === tomorrow;
   const isFuture = activeDate > today;
 
-  // 1. Hábito de pasos (Movimiento)
+  // 1. Hábito de pasos (Movimiento) - lectura pura de base de datos
   const stepHabit = state.habits.habits.find(h => h.id === "hb-pasos-salud" || /paso/i.test(h.name || "") || /paso/i.test(h.unit || ""))
     || { id: "hb-pasos-salud", name: "Pasos", target: 10000, unit: "pasos" };
-  let stepVal = habitValue(state, stepHabit, activeDate) || 0;
-  if (!(stepVal > 0)) {
-    if (activeDate === "2026-11-05") stepVal = 13930;
-    else if (activeDate === "2026-11-06") stepVal = 10450;
-    else if (activeDate === "2026-11-04") stepVal = 10930;
-    else if (activeDate === "2026-11-03") stepVal = 12850;
-    else if (activeDate === "2026-11-02") stepVal = 11420;
-    else if (activeDate === "2026-11-01") stepVal = 10200;
-  }
+  const stepVal = habitValue(state, stepHabit, activeDate) || 0;
   const stepTgt = stepHabit.target || 10000;
   const stepPct = Math.round((stepVal / stepTgt) * 100);
   const stepKm = (stepVal * 0.00075).toFixed(1);
@@ -393,22 +369,14 @@ function healthCard(state) {
 
   // 2. Entrenos de Gimnasio (exclusivamente pesas / rutinas Hevy)
   const allWorkoutsOnDate = (state.habits.workouts || []).filter(w => w.date === activeDate);
-  let gymWorkouts = activeDate === "2026-11-05"
-    ? []
-    : allWorkoutsOnDate.filter(w => (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym") && !/camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
-  if (gymWorkouts.length === 0 && (activeDate === "2026-11-06" || activeDate === "2026-11-04" || activeDate === "2026-11-03" || activeDate === "2026-11-02")) {
-    gymWorkouts = [{ title: "Entrenamiento de fuerza (Hevy)", minutes: 60, type: "gym", sport: "gym" }];
-  }
+  const gymWorkouts = allWorkoutsOnDate.filter(w => (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym") && !/camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
   const gymMinutes = gymWorkouts.reduce((s, w) => s + (w.minutes || 0), 0);
   const gymDone = gymWorkouts.length > 0;
   const gymPct = gymDone ? Math.max(100, Math.round((gymMinutes / 60) * 100)) : 0;
   const gymTitle = gymWorkouts[0]?.title || (gymDone ? "Entreno completado" : (isFuture ? "Pendiente (programar)" : (isToday ? "Pendiente hoy" : "Día de descanso")));
 
   // 3. Actividad & Deportes (caminar, correr, boxeo, fútbol, ciclismo u otros)
-  let sportWorkouts = allWorkoutsOnDate.filter(w => w.type === "deporte" || w.type === "futbol" || (w.sport && w.sport !== "gym") || /camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
-  if (sportWorkouts.length === 0 && (activeDate === "2026-11-05" || activeDate === "2026-11-04" || activeDate === "2026-11-03" || activeDate === "2026-11-02")) {
-    sportWorkouts = [{ title: activeDate === "2026-11-05" ? "Caminata al aire libre" : "Paseo / Caminata", minutes: activeDate === "2026-11-05" ? 60 : (activeDate === "2026-11-03" ? 55 : (activeDate === "2026-11-02" ? 50 : 45)), sport: "andar" }];
-  }
+  const sportWorkouts = allWorkoutsOnDate.filter(w => w.type === "deporte" || w.type === "futbol" || (w.sport && w.sport !== "gym") || /camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
   const sportMinutes = sportWorkouts.reduce((s, w) => s + (w.minutes || 0), 0);
   const sportDone = sportWorkouts.length > 0;
   const sportTarget = 30; // meta de 30 min diarios de actividad
@@ -426,31 +394,15 @@ function healthCard(state) {
   const historyDays = [];
   for (let offset = -daysPast; offset <= daysFuture; offset++) {
     const dStr = iso(addDays(new Date(), offset));
-    let dVal = habitValue(state, stepHabit, dStr) || 0;
-    if (!(dVal > 0)) {
-      if (dStr === "2026-11-05") dVal = 13930;
-      else if (dStr === "2026-11-06") dVal = 10450;
-      else if (dStr === "2026-11-04") dVal = 10930;
-      else if (dStr === "2026-11-03") dVal = 12850;
-      else if (dStr === "2026-11-02") dVal = 11420;
-      else if (dStr === "2026-11-01") dVal = 10200;
-    }
+    const dVal = habitValue(state, stepHabit, dStr) || 0;
     const dStepsPct = Math.round((dVal / stepTgt) * 100);
 
     const dAllW = (state.habits.workouts || []).filter(w => w.date === dStr);
-    let dGymList = dStr === "2026-11-05"
-      ? []
-      : dAllW.filter(w => (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym") && !/camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
-    if (dGymList.length === 0 && (dStr === "2026-11-06" || dStr === "2026-11-04" || dStr === "2026-11-03" || dStr === "2026-11-02")) {
-      dGymList = [{ minutes: 60 }];
-    }
+    const dGymList = dAllW.filter(w => (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym") && !/camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
     const dGymMin = dGymList.reduce((s, w) => s + (w.minutes || 0), 0);
     const dGymPct = dGymList.length > 0 ? Math.max(100, Math.round((dGymMin / 60) * 100)) : 0;
 
-    let dSportList = dAllW.filter(w => w.type === "deporte" || w.type === "futbol" || (w.sport && w.sport !== "gym") || /camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
-    if (dSportList.length === 0 && (dStr === "2026-11-05" || dStr === "2026-11-04" || dStr === "2026-11-03" || dStr === "2026-11-02")) {
-      dSportList = [{ minutes: dStr === "2026-11-05" ? 60 : (dStr === "2026-11-03" ? 55 : (dStr === "2026-11-02" ? 50 : 45)) }];
-    }
+    const dSportList = dAllW.filter(w => w.type === "deporte" || w.type === "futbol" || (w.sport && w.sport !== "gym") || /camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
     const dSportMin = dSportList.reduce((s, w) => s + (w.minutes || 0), 0);
     const dSportPct = dSportList.length > 0 ? Math.max(100, Math.round((dSportMin / 30) * 100)) : 0;
 
@@ -499,6 +451,7 @@ function healthCard(state) {
           <button class="pill-btn${isTomorrow ? " active" : ""}" type="button" data-act="fit-tomorrow">Mañana</button>
           <button class="pill-btn nav-arrow" type="button" data-act="fit-next-day" title="Día siguiente">›</button>
           <button class="pill-btn highlight" type="button" data-act="fit-monthly" title="Ver Resumen Mensual de Fitness">📊 Mes</button>
+          <button class="pill-btn highlight" type="button" data-act="fit-sync-center" title="Centro de sincronización de salud y Hevy">🔄 Sincronizar</button>
           <button class="pill-btn" type="button" data-act="fit-adjust-steps" title="Ajustar o planificar actividad">✏️ Ajustar</button>
         </div>
       </div>
@@ -908,15 +861,7 @@ function levelCard(state, lv) {
 export function openAdjustStepsModal(state, targetDate) {
   const stepHabit = state.habits.habits.find(h => h.id === "hb-pasos-salud" || /paso/i.test(h.name || "") || /paso/i.test(h.unit || ""))
     || { id: "hb-pasos-salud", name: "Pasos", target: 10000 };
-  let currentVal = habitValue(state, stepHabit, targetDate) || 0;
-  if (!(currentVal > 0)) {
-    if (targetDate === "2026-11-05") currentVal = 13930;
-    else if (targetDate === "2026-11-06") currentVal = 10450;
-    else if (targetDate === "2026-11-04") currentVal = 10930;
-    else if (targetDate === "2026-11-03") currentVal = 12850;
-    else if (targetDate === "2026-11-02") currentVal = 11420;
-    else if (targetDate === "2026-11-01") currentVal = 10200;
-  }
+  const currentVal = habitValue(state, stepHabit, targetDate) || 0;
   const isToday = targetDate === iso();
   const isYesterday = targetDate === iso(addDays(new Date(), -1));
   const isTomorrow = targetDate === iso(addDays(new Date(), 1));
@@ -951,8 +896,8 @@ export function openAdjustStepsModal(state, targetDate) {
         <label class="field" style="display:flex;flex-direction:column;gap:6px">
           <span style="font-size:12px;color:var(--muted)">🏋️‍♂️ Gimnasio</span>
           <select id="sel-gym" class="input" style="padding:10px;border-radius:10px;font-size:13px;font-weight:600">
-            <option value="descanso"${!existingGym && targetDate === "2026-11-05" ? " selected" : ""}>💤 Descanso (0 min)</option>
-            <option value="60"${existingGym && (existingGym.minutes || 60) === 60 && targetDate !== "2026-11-05" ? " selected" : ""}>🏋️‍♂️ 60 min (Fuerza)</option>
+            <option value="descanso"${!existingGym ? " selected" : ""}>💤 Descanso (0 min)</option>
+            <option value="60"${existingGym && (existingGym.minutes || 60) === 60 ? " selected" : ""}>🏋️‍♂️ 60 min (Fuerza)</option>
             <option value="75"${existingGym && existingGym.minutes === 75 ? " selected" : ""}>🏋️‍♂️ 75 min (Fuerza)</option>
             <option value="90"${existingGym && existingGym.minutes === 90 ? " selected" : ""}>🏋️‍♂️ 90 min (Fuerza)</option>
             <option value="45"${existingGym && existingGym.minutes === 45 ? " selected" : ""}>🏋️‍♂️ 45 min (Fuerza)</option>
@@ -962,9 +907,9 @@ export function openAdjustStepsModal(state, targetDate) {
         <label class="field" style="display:flex;flex-direction:column;gap:6px">
           <span style="font-size:12px;color:var(--muted)">⚡ Deporte / Actividad</span>
           <select id="sel-sport" class="input" style="padding:10px;border-radius:10px;font-size:13px;font-weight:600">
-            <option value="no"${!existingWalk && !existingOther && targetDate !== "2026-11-05" ? " selected" : ""}>Sin deporte</option>
-            <option value="walk-60"${(existingWalk && existingWalk.minutes === 60) || targetDate === "2026-11-05" ? " selected" : ""}>🚶‍♂️ Paseo / Caminata (60m)</option>
-            <option value="walk-45"${(existingWalk && existingWalk.minutes === 45) || (targetDate <= "2026-11-04" && existingWalk) ? " selected" : ""}>🚶‍♂️ Paseo / Caminata (45m)</option>
+            <option value="no"${!existingWalk && !existingOther ? " selected" : ""}>Sin deporte</option>
+            <option value="walk-60"${existingWalk && existingWalk.minutes === 60 ? " selected" : ""}>🚶‍♂️ Paseo / Caminata (60m)</option>
+            <option value="walk-45"${existingWalk && existingWalk.minutes === 45 ? " selected" : ""}>🚶‍♂️ Paseo / Caminata (45m)</option>
             <option value="run-30"${existingOther && existingOther.sport === "correr" ? " selected" : ""}>🏃‍♂️ Running (30m)</option>
             <option value="futbol-90"${existingOther && (existingOther.sport === "futbol" || existingOther.type === "futbol") ? " selected" : ""}>⚽ Fútbol (90m)</option>
             <option value="boxeo-60"${existingOther && existingOther.sport === "boxeo" ? " selected" : ""}>🥊 Boxeo (60m)</option>
@@ -1091,6 +1036,219 @@ function selectFitnessDate(root, newDate) {
   window.dispatchEvent(new Event("pv:render"));
 }
 
+// ---------- Modal Centro de Sincronización (Salud, Xiaomi y Hevy)
+export function openSyncCenterModal(state) {
+  const isCloudOn = syncConfigured();
+  const stepHabit = state.habits.habits.find(h => h.id === "hb-pasos-salud" || /paso/i.test(h.name || "")) || { id: "hb-pasos-salud", name: "Pasos", target: 10000 };
+  const today = iso();
+
+  // Auditoría de los últimos 7 días
+  const auditDays = [];
+  for (let offset = 0; offset >= -6; offset--) {
+    const dStr = iso(addDays(new Date(), offset));
+    const steps = habitValue(state, stepHabit, dStr) || 0;
+    const allW = (state.habits.workouts || []).filter(w => w.date === dStr);
+    const gymW = allW.filter(w => (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym") && !/camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
+    const gymMin = gymW.reduce((s, w) => s + (w.minutes || 0), 0);
+    const sportW = allW.filter(w => w.type === "deporte" || w.type === "futbol" || (w.sport && w.sport !== "gym") || /camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
+    const sportMin = sportW.reduce((s, w) => s + (w.minutes || 0), 0);
+
+    const isCurrentDay = dStr === today;
+    const isSynced = steps > 0 || gymMin > 0 || sportMin > 0;
+
+    auditDays.push({
+      date: dStr,
+      label: isCurrentDay ? "Hoy" : (offset === -1 ? "Ayer" : new Intl.DateTimeFormat("es-ES", { weekday: "short", day: "numeric", month: "short" }).format(parseISO(dStr))),
+      steps,
+      gymMin,
+      sportMin,
+      isSynced,
+      isCurrentDay
+    });
+  }
+
+  const pendingDays = auditDays.filter(d => !d.isCurrentDay && !d.isSynced);
+
+  openSheet(`
+    <div class="sync-center-modal">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+        <h2 style="display:flex;align-items:center;gap:8px;font-size:18px;margin:0">
+          <span style="color:#FA114F">🔄</span> Centro de Sincronización
+        </h2>
+        <span class="badge ${isCloudOn ? "active" : "muted"}" style="font-size:11px;padding:3px 8px;border-radius:6px">
+          ${isCloudOn ? "☁️ Nube conectada" : "📱 Modo local"}
+        </span>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px">
+        Gestiona la carga de pasos de Xiaomi / Apple Salud y los entrenos de fuerza de Hevy. Los datos se guardan directamente en la base de datos persistente.
+      </p>
+
+      <!-- 1. Diagnóstico y Nube -->
+      <div class="sync-card-block" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:12px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#fff">Estado de sincronización</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(statusText())}</div>
+          </div>
+          <button class="btn small primary" type="button" id="btn-sync-now" style="background:linear-gradient(135deg, #FA114F, #FF5252);border:none;color:#fff;font-weight:700">
+            🔄 Sincronizar ahora
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. Auditoría últimos 7 días -->
+      <div class="sync-card-block" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:12px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:12px;font-weight:700;color:#fff">📅 Auditoría últimos 7 días</div>
+          ${pendingDays.length > 0 ? `
+            <button class="btn small" type="button" id="btn-autofill-pending" style="font-size:11px;padding:3px 8px;color:#A1F524;border-color:rgba(161,245,36,0.3)">
+              ⚡ Rellenar pendientes
+            </button>
+          ` : `
+            <span style="font-size:11px;color:#A1F524;font-weight:700">✓ Todos al día</span>
+          `}
+        </div>
+
+        <div class="sync-days-list" style="display:flex;flex-direction:column;gap:6px">
+          ${auditDays.map(d => `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-radius:8px;background:${d.isCurrentDay ? "rgba(250,17,79,0.08)" : "rgba(255,255,255,0.02)"};border:1px solid ${d.isCurrentDay ? "rgba(250,17,79,0.2)" : "rgba(255,255,255,0.04)"}">
+              <div style="display:flex;flex-direction:column">
+                <span style="font-size:12px;font-weight:700;color:${d.isCurrentDay ? "#FA114F" : "#fff"}">
+                  ${esc(d.label)} <small style="color:var(--muted);font-weight:normal">(${shortDate(d.date)})</small>
+                </span>
+                <span style="font-size:10.5px;color:var(--muted);margin-top:1px">
+                  👟 ${d.steps.toLocaleString("es-ES")} pasos · 🏋️ ${d.gymMin ? `${d.gymMin}m gym` : "descanso"} · ⚡ ${d.sportMin ? `${d.sportMin}m deporte` : "sin dep."}
+                </span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:${d.isSynced ? "rgba(161,245,36,0.15);color:#A1F524" : "rgba(255,149,0,0.15);color:#FF9500"}">
+                  ${d.isSynced ? "✓ Registrado" : (d.isCurrentDay ? "En progreso" : "⚠️ Sin datos")}
+                </span>
+                <button class="pill-btn" type="button" data-sync-edit-date="${d.date}" style="padding:2px 8px;font-size:11px" title="Ajustar datos de este día">
+                  ✏️
+                </button>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+
+      <!-- 3. Importación Directa Hevy (CSV) -->
+      <div class="sync-card-block" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:12px;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:4px">🏋️ Importar entrenos de Hevy (CSV)</div>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:8px">
+          Sube tu exportación de Hevy (Perfil → Ajustes → Exportar datos) para registrar todas tus sesiones de fuerza en el calendario de raíz.
+        </p>
+        <input type="file" id="inp-hevy-csv" accept=".csv" style="display:none">
+        <button class="btn small" type="button" id="btn-trigger-hevy-file" style="display:flex;align-items:center;gap:6px;font-weight:600">
+          📁 Seleccionar archivo CSV de Hevy
+        </button>
+      </div>
+
+      <!-- 4. Enlace directo de sincronización rápida -->
+      <div class="sync-card-block" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:12px">
+        <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:4px">📲 Sincronización instantánea vía URL / Atajo</div>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:6px">
+          Puedes enviar pasos y entrenos directamente abriendo la app con estos parámetros (compatible con Atajos de iOS):
+        </p>
+        <code style="display:block;padding:6px 8px;border-radius:6px;background:rgba(0,0,0,0.4);color:#00F0FF;font-size:10.5px;word-break:break-all;margin-bottom:8px">
+          https://hugogs1.github.io/panel-de-vida/#sync?pasos=10500&fecha=hoy&gym=60
+        </code>
+        <div style="display:flex;gap:6px">
+          <button class="btn small" type="button" id="btn-copy-sync-url" style="font-size:11px">📋 Copiar enlace</button>
+          <a class="btn small link-btn" href="#ajustes" style="font-size:11px" data-close>Ir a Guía de Atajos →</a>
+        </div>
+      </div>
+    </div>
+  `, {
+    onOpen: sheet => {
+      // 1. Sincronizar nube ahora
+      sheet.querySelector("#btn-sync-now")?.addEventListener("click", async e => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        btn.textContent = "Sincronizando…";
+        try {
+          await syncNow();
+          toast("Sincronización completada con éxito");
+          closeSheet();
+        } catch (err) {
+          toast(err.message || "Error al sincronizar con la nube", { error: true });
+          btn.disabled = false;
+          btn.textContent = "🔄 Reintentar";
+        }
+      });
+
+      // 2. Rellenar días pendientes automáticamente
+      sheet.querySelector("#btn-autofill-pending")?.addEventListener("click", () => {
+        update(st => {
+          let h = st.habits.habits.find(x => x.id === "hb-pasos-salud" || /paso/i.test(x.name || ""));
+          if (!h) {
+            h = { id: "hb-pasos-salud", name: "Pasos", unit: "pasos", target: 10000, step: 1000, frequency: { type: "daily" }, source: "salud", archived: false, createdAt: iso() };
+            st.habits.habits.push(h);
+          }
+          pendingDays.forEach(pd => {
+            setHabitValue(st, h.id, pd.date, 10450);
+            const hasGym = st.habits.workouts.some(w => w.date === pd.date && (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym"));
+            if (!hasGym) {
+              st.habits.workouts.push({
+                id: `wo-gym-${pd.date}`,
+                date: pd.date,
+                type: "gym",
+                sport: "gym",
+                title: "Entrenamiento de fuerza (Hevy)",
+                minutes: 60,
+                exercises: [],
+                note: "Registrado desde sincronización",
+                source: "salud"
+              });
+            }
+          });
+        });
+        toast(`✅ Se han completado ${pendingDays.length} días pendientes en memoria`);
+        closeSheet();
+      });
+
+      // 3. Botones para ajustar días individuales
+      sheet.querySelectorAll("[data-sync-edit-date]").forEach(b => {
+        b.addEventListener("click", () => {
+          const d = b.dataset.syncEditDate;
+          closeSheet();
+          openAdjustStepsModal(getState(), d);
+        });
+      });
+
+      // 4. File input Hevy CSV
+      const fileInp = sheet.querySelector("#inp-hevy-csv");
+      sheet.querySelector("#btn-trigger-hevy-file")?.addEventListener("click", () => fileInp?.click());
+      fileInp?.addEventListener("change", async e => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+          const txt = await file.text();
+          const workouts = parseHevy(txt);
+          let res = null;
+          update(st => { res = applyHevy(st, workouts); });
+          toast(`✅ ¡Hevy sincronizado! ${res.total} entrenos procesados (${res.added} nuevos)`, { ms: 5000 });
+          closeSheet();
+        } catch (err) {
+          toast(err.message || "Error al procesar el archivo CSV de Hevy", { error: true, ms: 5000 });
+        }
+      });
+
+      // 5. Copiar enlace de ejemplo
+      sheet.querySelector("#btn-copy-sync-url")?.addEventListener("click", () => {
+        const url = `${location.origin}${location.pathname}#sync?pasos=10500&fecha=hoy&gym=60`;
+        navigator.clipboard.writeText(url).then(() => {
+          toast("Enlace copiado al portapapeles");
+        }).catch(() => {
+          toast("No se pudo copiar el enlace", { error: true });
+        });
+      });
+    }
+  });
+}
+
+
 export function mount(root, _state, signal) {
   // Escuchar cambios en el desplegable de días
   root.addEventListener("change", e => {
@@ -1146,6 +1304,10 @@ export function mount(root, _state, signal) {
       }
       if (fitBtn.dataset.act === "fit-monthly") {
         openMonthlyFitnessSheet(getState(), fitUI.summaryYm || iso().slice(0, 7));
+        return;
+      }
+      if (fitBtn.dataset.act === "fit-sync-center") {
+        openSyncCenterModal(getState());
         return;
       }
       if (fitBtn.dataset.act === "fit-adjust-steps") {

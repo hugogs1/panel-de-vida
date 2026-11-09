@@ -170,21 +170,21 @@ export function ensureAutoHabits(s) {
     { date: "2026-11-03", steps: 12850, gym: true,  walkMin: 55, walkTitle: "Paseo / Caminata" },
     { date: "2026-11-04", steps: 10930, gym: true,  walkMin: 45, walkTitle: "Paseo / Caminata" },
     { date: "2026-11-05", steps: 13930, gym: false, walkMin: 60, walkTitle: "Caminata al aire libre" },
-    { date: "2026-11-06", steps: 10450, gym: true,  walkMin: 0, walkTitle: "" }
+    { date: "2026-11-06", steps: 10450, gym: true,  walkMin: 0, walkTitle: "" },
+    { date: "2026-11-07", steps: 10450, gym: true,  walkMin: 45, walkTitle: "Paseo / Caminata" },
+    { date: "2026-11-08", steps: 11200, gym: false, walkMin: 60, walkTitle: "Caminata al aire libre" }
   ];
 
   novHistory.forEach(item => {
-    // Registrar pasos si no existen
+    // Registrar pasos solo si no existen para preservar cualquier ajuste o sincronización real
     const log = s.habits.logs.find(l => (l.habitId === stepHabitId || /paso/i.test(l.habitId)) && l.date === item.date);
     if (!log) {
       s.habits.logs.push({ id: `log-pasos-${item.date}`, habitId: stepHabitId, date: item.date, value: item.steps });
-    } else if (item.date === "2026-11-05") {
-      log.value = 13930;
     } else if (!(log.value > 0)) {
       log.value = item.steps;
     }
 
-    // Registrar entreno de fuerza si aplica y no existe
+    // Registrar entreno de fuerza si aplica y no existe ningún entreno en esa fecha
     if (item.gym) {
       const hasGym = s.habits.workouts.some(w => w.date === item.date && (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym"));
       if (!hasGym) {
@@ -219,33 +219,6 @@ export function ensureAutoHabits(s) {
       }
     }
   });
-
-  // 4. LIMPIEZA DEL DÍA ACTUAL (Para que empiece en 0 si no se ha hecho nada)
-  const nowD = new Date();
-  const z = n => String(n).padStart(2, "0");
-  const todayStr = `${nowD.getFullYear()}-${z(nowD.getMonth() + 1)}-${z(nowD.getDate())}`;
-
-  // Si hoy no es un día pasado del historial (es decir, hoy es 2026-11-07 o posterior):
-  // Limpiar cualquier entreno auto-inyectado erróneamente con id automático
-  s.habits.workouts = (s.habits.workouts || []).filter(w => {
-    if (w.date === todayStr && w.id === `wo-gym-${todayStr}` && w.note === "Registrado desde Hevy / Salud") {
-      return false;
-    }
-    if (w.date === "2026-11-07" && w.id === "wo-gym-2026-11-07" && w.note === "Registrado desde Hevy / Salud") {
-      return false;
-    }
-    return true;
-  });
-
-  // Limpiar cualquier log de pasos auto-inyectado de 10450 para hoy si fue creado automáticamente
-  const todayLog = s.habits.logs.find(l => (l.habitId === stepHabitId || /paso/i.test(l.habitId)) && l.date === todayStr);
-  if (todayLog && todayLog.id === `log-pasos-${todayStr}` && todayLog.value === 10450) {
-    todayLog.value = 0;
-  }
-  const satLog = s.habits.logs.find(l => (l.habitId === stepHabitId || /paso/i.test(l.habitId)) && l.date === "2026-11-07");
-  if (satLog && satLog.id === "log-pasos-2026-11-07" && satLog.value === 10450) {
-    satLog.value = 0;
-  }
 
   return s;
 }

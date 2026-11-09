@@ -913,7 +913,19 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
 .fitness-quick-nav {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.pill-btn.highlight {
+  background: rgba(250, 17, 79, 0.15);
+  border-color: rgba(250, 17, 79, 0.35);
+  color: #FA114F;
+  font-weight: 700;
+}
+.pill-btn.highlight:hover {
+  background: rgba(250, 17, 79, 0.25);
+  color: #fff;
 }
 .pill-btn {
   background: rgba(255, 255, 255, 0.06);
@@ -1062,7 +1074,10 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   letter-spacing: .02em;
   color: var(--c);
   white-space: nowrap;
-  flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
 }
 .fdc-target {
   font-size: 9.5px;
@@ -2129,4 +2144,18 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   border-radius: 8px;
   padding: 3px 8px;
   color: var(--fg);
+}
+
+/* Centro de Sincronización */
+.sync-center-modal {
+  display: flex;
+  flex-direction: column;
+}
+.sync-card-block {
+  transition: all .15s ease;
+}
+.sync-days-list {
+  max-height: 280px;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
