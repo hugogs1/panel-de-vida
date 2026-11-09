@@ -1273,9 +1273,24 @@ export function openSyncCenterModal(state) {
           ${isCloudOn ? "☁️ Nube conectada" : "📱 Modo local"}
         </span>
       </div>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:14px">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">
         Gestiona la carga de pasos de Xiaomi / Apple Salud y los entrenos de fuerza de Hevy. Los datos se guardan directamente en la base de datos persistente.
       </p>
+
+      <!-- Tarjeta explicativa de permisos de Apple Salud vs PWA Web -->
+      <div class="sync-card-block" style="background:rgba(255,149,0,0.08);border:1px solid rgba(255,149,0,0.25);border-radius:12px;padding:11px 12px;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:#FF9500;display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <span>ℹ️</span> ¿Por qué no entran solos si Hevy ya tiene permisos de Salud?
+        </div>
+        <p style="font-size:11.5px;color:var(--fg);line-height:1.45;margin:0 0 6px">
+          Tus permisos de Hevy son para escribir en la app nativa <b>Salud de Apple</b>. Al ser Panel de Vida una <b>aplicación web (PWA)</b>, Apple prohíbe por privacidad que las páginas web lean datos de Salud en segundo plano.
+        </p>
+        <p style="font-size:11px;color:var(--muted);line-height:1.45;margin:0">
+          Para grabarlos en el panel dispones de dos opciones oficiales:
+          <br>📁 <b>Importar CSV de Hevy</b> (con 1 toque se cargan todos tus entrenos, series, pesos y ejercicios).
+          <br>📲 <b>Atajo automático de iPhone</b> (mediante la app Atajos de iOS, para que el iPhone lo envíe al terminar).
+        </p>
+      </div>
 
       <!-- 1. Diagnóstico y Nube -->
       <div class="sync-card-block" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:12px;margin-bottom:12px">
@@ -1348,9 +1363,14 @@ export function openSyncCenterModal(state) {
         <code style="display:block;padding:6px 8px;border-radius:6px;background:rgba(0,0,0,0.4);color:#00F0FF;font-size:10.5px;word-break:break-all;margin-bottom:8px">
           https://hugogs1.github.io/panel-de-vida/#sync?pasos=10500&fecha=hoy&gym=60
         </code>
-        <div style="display:flex;gap:6px">
-          <button class="btn small" type="button" id="btn-copy-sync-url" style="font-size:11px">📋 Copiar enlace</button>
-          <a class="btn small link-btn" href="#ajustes" style="font-size:11px" data-close>Ir a Guía de Atajos →</a>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn small" type="button" id="btn-copy-hevy-url" style="font-size:11px;background:rgba(161,245,36,0.15);color:#A1F524;border-color:rgba(161,245,36,0.3)">
+            🏋️ Copiar URL para Hevy
+          </button>
+          <button class="btn small" type="button" id="btn-copy-sync-url" style="font-size:11px">
+            👟 Copiar URL Pasos
+          </button>
+          <a class="btn small link-btn" href="#ajustes" style="font-size:11px" data-close>Guía Atajos →</a>
         </div>
       </div>
     </div>
@@ -1429,7 +1449,16 @@ export function openSyncCenterModal(state) {
         }
       });
 
-      // 5. Copiar enlace de ejemplo
+      // 5. Copiar enlaces de ejemplo para Atajos de iOS
+      sheet.querySelector("#btn-copy-hevy-url")?.addEventListener("click", () => {
+        const url = `${location.origin}${location.pathname}#sync?gym=60&gym_title=Entreno+Hevy&fecha=hoy`;
+        navigator.clipboard.writeText(url).then(() => {
+          toast("Enlace para atajo de Hevy copiado");
+        }).catch(() => {
+          toast("No se pudo copiar el enlace", { error: true });
+        });
+      });
+
       sheet.querySelector("#btn-copy-sync-url")?.addEventListener("click", () => {
         const url = `${location.origin}${location.pathname}#sync?pasos=10500&fecha=hoy&gym=60`;
         navigator.clipboard.writeText(url).then(() => {
