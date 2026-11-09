@@ -143,10 +143,15 @@ export function applyInbox(s, messages, today = iso()) {
       const p = m.proyecto && s.work.projects.find(x => !x.archived && norm(x.name).includes(norm(m.proyecto)));
       s.work.entries.push({ id, date: parseDay(m.fecha, today) || today, minutes, kind, projectId: p?.id || null, note: m.nota || "", source: "siri" });
       done.push(`${minutes >= 60 ? `${String(Math.round(minutes / 6) / 10).replace(".", ",")} h` : `${minutes} min`} de ${kind}`);
-    } else if (tipo === "gimnasio" || tipo === "gym" || tipo === "futbol" || tipo === "entreno" || tipo === "deporte" || tipo === "actividad" || tipo === "caminar" || tipo === "andar" || tipo === "paseo" || tipo === "correr") {
-      const minutes = Math.round(num(m.minutos)) || (tipo === "futbol" ? 90 : 60);
+    } else if (tipo === "gimnasio" || tipo === "gym" || tipo === "fuerza" || tipo === "pesas" || tipo === "hevy" || tipo === "futbol" || tipo === "entreno" || tipo === "deporte" || tipo === "actividad" || tipo === "caminar" || tipo === "andar" || tipo === "paseo" || tipo === "correr" || tipo === "workout") {
+      let rawMin = num(m.minutos || m.duracion || m.tiempo || m.mins || m.duration);
+      if (Number.isFinite(rawMin) && rawMin > 500) {
+        // Si supera 500, viene en segundos desde Apple Health / Atajos (ej. 3600 s = 60 min, 3120 s = 52 min)
+        rawMin = Math.round(rawMin / 60);
+      }
+      const minutes = Math.max(1, Math.round(rawMin)) || (tipo === "futbol" ? 90 : 60);
       const date = parseDay(m.fecha, today) || today;
-      const rawName = String(m.nombre || m.titulo || m.actividad || (tipo === "caminar" || tipo === "andar" || tipo === "paseo" ? "Caminata" : (tipo === "correr" ? "Running" : (tipo === "gimnasio" || tipo === "gym" ? "Gimnasio" : "Entreno")))).trim();
+      const rawName = String(m.nombre || m.titulo || m.actividad || m.title || m.workout || (tipo === "caminar" || tipo === "andar" || tipo === "paseo" ? "Caminata" : (tipo === "correr" ? "Running" : (tipo === "gimnasio" || tipo === "gym" || tipo === "fuerza" || tipo === "pesas" || tipo === "hevy" ? "Gimnasio" : "Entreno")))).trim();
       const nName = norm(rawName);
 
       const isWalking = /camin|andar|paseo|walk/i.test(nName);
@@ -154,7 +159,12 @@ export function applyInbox(s, messages, today = iso()) {
       const isBoxing = /boxeo|boxing|box/i.test(nName);
       const isFutbol = tipo === "futbol" || ["si", "sí", "partido"].includes(norm(m.partido)) || /futbol|fútbol/i.test(nName);
       const isCycling = /bici|ciclism|bike|cycling/i.test(nName);
-      const isGym = tipo === "gimnasio" || tipo === "gym" || /gym|gimnasio|fuerza|pesas|hevy|musculacion|press|sentadilla/i.test(nName);
+
+      // Reconocimiento inteligente de Gimnasio / Fuerza / Hevy:
+      const isGym = tipo === "gimnasio" || tipo === "gym" || tipo === "fuerza" || tipo === "pesas" || tipo === "hevy"
+        || /gym|gimnasio|fuerza|pesas|hevy|musculacion|press|sentadilla|strength|weight|pierna|pecho|espalda|torso|brazo|biceps|triceps|hombro|gluteo|pull|push|legs|upper|lower|fullbody|full body|rutina|mancuerna|barra|banca|deadlift|remo|dominada|hipertrofia|crossfit/i.test(nName)
+        || /hevy|fuerza|strength/i.test(String(m.origen || m.app || m.fuente || m.nota || ""))
+        || (tipo === "entreno" && !/tenis|padel|natacion|basket|baloncesto|yoga|pilates/i.test(nName));
 
       if (isFutbol) {
         s.habits.workouts.push({ id, date, type: "futbol", sport: "futbol", kind: ["si", "sí", "partido"].includes(norm(m.partido)) ? "partido" : "entrenamiento", minutes, title: "Fútbol", note: m.nota || "", source: "salud" });

@@ -84,8 +84,20 @@ function handleDirectSync() {
     }
 
     const pasos = parseInt(params.get("pasos") || params.get("steps") || "0", 10);
-    const gymMin = parseInt(params.get("gym") || params.get("fuerza") || "0", 10);
-    const gymTitle = params.get("gym_title") || "Entrenamiento de fuerza (Hevy)";
+    let rawGym = parseInt(
+      params.get("gym") ||
+      params.get("hevy") ||
+      params.get("fuerza") ||
+      params.get("entreno") ||
+      params.get("pesas") ||
+      params.get("gimnasio") ||
+      params.get("workout") ||
+      params.get("duracion") ||
+      "0", 10
+    );
+    if (rawGym > 500) rawGym = Math.round(rawGym / 60); // Conversión automática de segundos a minutos si viene en segundos
+    const gymMin = rawGym;
+    const gymTitle = params.get("gym_title") || params.get("titulo") || params.get("title") || params.get("actividad") || "Entrenamiento de fuerza (Hevy)";
     const deporte = params.get("deporte") || params.get("sport") || "";
     const deporteMin = parseInt(params.get("deporte_min") || params.get("minutos") || "0", 10);
     const batchJson = params.get("batch") || params.get("lote") || "";
