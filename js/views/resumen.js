@@ -7,7 +7,7 @@ import { backupDue } from "../backup.js";
 import { update, getState } from "../state.js";
 import { syncConfigured, syncNow, getSyncStatus, statusText } from "../sync.js";
 import { parseHevy, applyHevy } from "../hevy.js";
-import { todayItems, streak, iso, parseISO, addDays } from "../stats.js";
+import { todayItems, streak, iso, parseISO, addDays, weekStart } from "../stats.js";
 import { habitsToday, habitValue, setHabitValue, AUTO_LABEL } from "../habits.js";
 import { toggleTask, monthGrid } from "../agenda.js";
 import { ring, fitnessDial, fitnessActivityRings } from "../charts.js";
@@ -17,6 +17,19 @@ import { weeklyBanner, closeWeekly } from "./semana.js";
 const PRI = { alta: ["Alta", "var(--danger)"], media: ["Media", "var(--agenda)"], baja: ["Baja", "var(--muted)"] };
 const num1 = n => new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 }).format(n);
 const signed = n => n > 0 ? `+${eur(n)}` : eur(n);
+
+
+export function getWeekOffsetForDate(dateStr) {
+  try {
+    const targetDate = parseISO(dateStr);
+    const curMonday = weekStart(new Date());
+    const tgtMonday = weekStart(targetDate);
+    const diffTime = tgtMonday.getTime() - curMonday.getTime();
+    return Math.round(diffTime / (7 * 24 * 3600 * 1000));
+  } catch {
+    return 0;
+  }
+}
 
 const fitUI = {
   selectedDate: null, // Al cargar la app, siempre inicia en HOY (iso())
@@ -385,15 +398,35 @@ function healthCard(state) {
     ? sportWorkouts.map(w => w.title || w.sport || "Actividad").join(", ")
     : (isFuture ? "Sin actividad programada" : (isToday ? "Sin actividad" : "Día de descanso"));
 
-  // Tira de días ampliada:
-  // - Pasados: 10 días hacia atrás
-  // - Presente: Hoy
-  // - Futuros: 14 días siguientes hacia adelante
-  const daysPast = 10;
-  const daysFuture = 14;
+  // Sincronizar semana activa de los círculos con la fecha seleccionada
+  if (fitUI.weekOffset === undefined || fitUI.weekOffset === null) {
+    fitUI.weekOffset = getWeekOffsetForDate(activeDate);
+  }
+
+  const curWeekMonday = weekStart(new Date());
+  const activeWeekMonday = addDays(curWeekMonday, (fitUI.weekOffset || 0) * 7);
+  const activeWeekSunday = addDays(activeWeekMonday, 6);
+
+  const isCurrentWeek = (fitUI.weekOffset || 0) === 0;
+  const isLastWeek = (fitUI.weekOffset || 0) === -1;
+  const isNextWeek = (fitUI.weekOffset || 0) === 1;
+
+  const monLabel = new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short" }).format(activeWeekMonday);
+  const sunLabel = new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short" }).format(activeWeekSunday);
+
+  const weekTitle = isCurrentWeek
+    ? `Esta semana (${monLabel} - ${sunLabel})`
+    : (isLastWeek
+      ? `Semana pasada (${monLabel} - ${sunLabel})`
+      : (isNextWeek
+        ? `Próxima semana (${monLabel} - ${sunLabel})`
+        : `Semana del ${monLabel} al ${sunLabel}`));
+
+  // 7 Días exactos de la semana navegada para los círculos
   const historyDays = [];
-  for (let offset = -daysPast; offset <= daysFuture; offset++) {
-    const dStr = iso(addDays(new Date(), offset));
+  for (let i = 0; i < 7; i++) {
+    const dayDate = addDays(activeWeekMonday, i);
+    const dStr = iso(dayDate);
     const dVal = habitValue(state, stepHabit, dStr) || 0;
     const dStepsPct = Math.round((dVal / stepTgt) * 100);
 
@@ -406,14 +439,13 @@ function healthCard(state) {
     const dSportMin = dSportList.reduce((s, w) => s + (w.minutes || 0), 0);
     const dSportPct = dSportList.length > 0 ? Math.max(100, Math.round((dSportMin / 30) * 100)) : 0;
 
-    const dateObj = parseISO(dStr);
-    const dNum = dateObj.getDate();
+    const dNum = dayDate.getDate();
     let name = "";
-    if (dStr === today) name = "Hoy";
-    else if (dStr === yesterday) name = "Ayer";
-    else if (dStr === tomorrow) name = "Mañana";
+    if (dStr === today) name = "HOY";
+    else if (dStr === yesterday) name = "AYER";
+    else if (dStr === tomorrow) name = "MAÑ";
     else {
-      const wd = new Intl.DateTimeFormat("es-ES", { weekday: "narrow" }).format(dateObj).toUpperCase();
+      const wd = new Intl.DateTimeFormat("es-ES", { weekday: "narrow" }).format(dayDate).toUpperCase();
       name = wd;
     }
 
@@ -427,6 +459,46 @@ function healthCard(state) {
       isSelected: dStr === activeDate,
       isToday: dStr === today,
       isFuture: dStr > today
+    });
+  }
+
+  // Días del desplegable: 4 semanas hacia atrás y 2 hacia adelante (42 días), con nombre claro y métricas
+  const dropdownDays = [];
+  for (let offset = -28; offset <= 14; offset++) {
+    const dStr = iso(addDays(new Date(), offset));
+    const dDate = parseISO(dStr);
+    const dVal = habitValue(state, stepHabit, dStr) || 0;
+    const dAllW = (state.habits.workouts || []).filter(w => w.date === dStr);
+    const dGym = dAllW.some(w => (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym") && !/camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
+    const dGymMin = dAllW.filter(w => (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym") && !/camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || ""))).reduce((s, w) => s + (w.minutes || 0), 0);
+    const dSportList = dAllW.filter(w => w.type === "deporte" || w.type === "futbol" || (w.sport && w.sport !== "gym") || /camin|andar|paseo|walk/i.test((w.title || "") + " " + (w.note || "")));
+    const dSportMinTotal = dSportList.reduce((s, w) => s + (w.minutes || 0), 0);
+
+    const isTodayD = dStr === today;
+    const isYesterdayD = dStr === yesterday;
+    const isTomorrowD = dStr === tomorrow;
+
+    const weekdayShort = new Intl.DateTimeFormat("es-ES", { weekday: "short" }).format(dDate);
+    const weekdayCap = weekdayShort.charAt(0).toUpperCase() + weekdayShort.slice(1).replace(".", "");
+    const dateFormatted = new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short" }).format(dDate);
+
+    let prefix = "";
+    if (isTodayD) prefix = "★ HOY · ";
+    else if (isYesterdayD) prefix = "AYER · ";
+    else if (isTomorrowD) prefix = "MAÑANA · ";
+
+    let meta = [];
+    if (dVal > 0) meta.push(`👟 ${num1(dVal)} pas.`);
+    if (dGymMin > 0) meta.push(`🏋️ ${dGymMin}m gym`);
+    else if (dGym) meta.push(`🏋️ gym`);
+    if (dSportMinTotal > 0) meta.push(`⚡ ${dSportMinTotal}m`);
+
+    const metaStr = meta.length ? ` (${meta.join(" · ")})` : (dStr > today ? " (Planificar)" : " (0 pas.)");
+
+    dropdownDays.push({
+      date: dStr,
+      label: `${prefix}${weekdayCap}, ${dateFormatted}${metaStr}`,
+      isSelected: dStr === activeDate
     });
   }
 
@@ -456,15 +528,15 @@ function healthCard(state) {
         </div>
       </div>
 
-      <!-- Desplegable y selector directo de día -->
+      <!-- Desplegable y selector directo de día (alto contraste y legible) -->
       <div class="fit-dropdown-bar">
         <label class="fit-dropdown-label" for="fit-day-select">
-          <span style="color:#FA114F">📅</span> Desplegable de días:
+          <span style="color:#FA114F">📅</span> Seleccionar día:
         </label>
-        <select id="fit-day-select" class="fit-dropdown-select input" data-act="fit-dropdown-select" aria-label="Seleccionar día de actividad">
-          ${historyDays.map(d => `
+        <select id="fit-day-select" class="fit-dropdown-select" data-act="fit-dropdown-select" aria-label="Seleccionar día de actividad">
+          ${dropdownDays.map(d => `
             <option value="${d.date}"${d.isSelected ? " selected" : ""}>
-              ${d.isToday ? "★ Hoy" : (d.isYesterday ? "Ayer" : (d.isTomorrow ? "Mañana" : d.name))} (${shortDate(d.date)})
+              ${d.label}
             </option>
           `).join("")}
         </select>
@@ -473,8 +545,28 @@ function healthCard(state) {
         </button>
       </div>
 
-      <!-- Tira interactiva de días con 3 mini-anillos concéntricos Apple Fitness (pasados, hoy y todos los siguientes) -->
-      <div class="fitness-days-strip">
+      <!-- Barra de navegación semanal de los círculos -->
+      <div class="fit-week-bar">
+        <button class="pill-btn nav-week-btn" type="button" data-act="fit-prev-week" title="Semana anterior">
+          ‹ Sem. anterior
+        </button>
+        <div class="fit-week-info">
+          <span class="fit-week-badge">📅 ${weekTitle}</span>
+        </div>
+        <div class="fit-week-actions">
+          ${!isCurrentWeek ? `
+            <button class="pill-btn highlight nav-week-btn" type="button" data-act="fit-current-week" title="Volver a esta semana">
+              ★ Esta semana
+            </button>
+          ` : ""}
+          <button class="pill-btn nav-week-btn" type="button" data-act="fit-next-week" title="Semana siguiente">
+            Sem. siguiente ›
+          </button>
+        </div>
+      </div>
+
+      <!-- Tira de los 7 días de la semana con mini-anillos Apple Fitness -->
+      <div class="fitness-days-strip weekly-mode">
         ${historyDays.map(d => `
           <button class="fit-day-chip${d.isSelected ? " selected" : ""}${d.isFuture ? " is-future" : ""}${d.isToday ? " is-today" : ""}" type="button" 
             data-act="fit-select-day" data-date="${d.date}" aria-label="Ver actividad del ${d.name} ${d.dayNum}">
@@ -1014,6 +1106,7 @@ export function openAdjustStepsModal(state, targetDate) {
 // Navegación interactiva de fechas de actividad: actualización 100% estática sin saltos de la barra
 function selectFitnessDate(root, newDate) {
   fitUI.selectedDate = newDate;
+  fitUI.weekOffset = getWeekOffsetForDate(newDate);
   try { sessionStorage.setItem("pv_fit_selected_date", newDate); } catch {}
 
   const bento = root.querySelector(".fitness-bento") || document.querySelector(".fitness-bento");
@@ -1278,6 +1371,23 @@ export function mount(root, _state, signal) {
     if (fitBtn) {
       if (fitBtn.dataset.act === "fit-select-day") {
         selectFitnessDate(root, fitBtn.dataset.date);
+        return;
+      }
+      if (fitBtn.dataset.act === "fit-prev-week") {
+        fitUI.weekOffset = (fitUI.weekOffset || 0) - 1;
+        const cur = fitUI.selectedDate || iso();
+        selectFitnessDate(root, iso(addDays(parseISO(cur), -7)));
+        return;
+      }
+      if (fitBtn.dataset.act === "fit-next-week") {
+        fitUI.weekOffset = (fitUI.weekOffset || 0) + 1;
+        const cur = fitUI.selectedDate || iso();
+        selectFitnessDate(root, iso(addDays(parseISO(cur), 7)));
+        return;
+      }
+      if (fitBtn.dataset.act === "fit-current-week") {
+        fitUI.weekOffset = 0;
+        selectFitnessDate(root, iso());
         return;
       }
       if (fitBtn.dataset.act === "fit-prev-day") {

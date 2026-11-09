@@ -2082,15 +2082,96 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
 }
 .fit-dropdown-select {
   flex: 1;
-  min-width: 140px;
-  padding: 6px 10px;
+  min-width: 180px;
+  padding: 8px 12px;
   border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  background-color: #1a1d27 !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  color: #ffffff !important;
+  color-scheme: dark !important;
+  cursor: pointer;
+  outline: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.fit-dropdown-select:focus {
+  border-color: #FA114F !important;
+  box-shadow: 0 0 0 2px rgba(250, 17, 79, 0.3);
+}
+.fit-dropdown-select option {
+  background-color: #1a1d27 !important;
+  color: #ffffff !important;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Barra de navegación de semanas en los círculos */
+.fit-week-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 4px 0 6px;
+  padding: 4px 2px;
+  flex-wrap: wrap;
+}
+.fit-week-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fit-week-badge {
   font-size: 12px;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  letter-spacing: -.01em;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 3px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.fit-week-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.nav-week-btn {
+  font-size: 11px;
+  padding: 4px 10px;
+  font-weight: 700;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: var(--fg);
   cursor: pointer;
+  transition: all .15s ease;
+}
+.nav-week-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+/* 7 Días de la semana en cuadrícula adaptable perfecta */
+.fitness-days-strip.weekly-mode {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+  padding: 4px 0 8px;
+  overflow: visible;
+}
+.fitness-days-strip.weekly-mode .fit-day-chip {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
 }
 .fit-selected-day-panel {
   margin-top: 10px;
