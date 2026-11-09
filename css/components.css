@@ -976,7 +976,7 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   border: 1px solid rgba(255, 255, 255, 0.06);
   cursor: pointer;
   min-width: 52px;
-  transition: all 0.2s cubic-bezier(.2,.8,.2,1);
+  transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1), background 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
   color: inherit;
   user-select: none;
 }
@@ -1004,6 +1004,10 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   height: 34px;
   display: grid;
   place-items: center;
+  transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.fit-day-chip.selected .fit-mini-ring {
+  transform: scale(1.08);
 }
 .fit-d-num {
   font-size: 13px;
@@ -2225,6 +2229,131 @@ code { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   .nav-week-today-btn {
     font-size: 10.5px;
     padding: 3px 8px;
+  }
+}
+
+/* ===============================================
+   TRANSICIÓN SEMANAL ESTILO IPHONE FITNESS (FLUID CAROUSEL)
+=============================================== */
+.fit-strip-viewport {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  border-radius: 16px;
+  min-height: 72px;
+}
+
+.fit-outgoing-strip {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Desplazamiento hacia la izquierda (Semana siguiente) */
+@keyframes fitSlideOutLeft {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(-100%, 0, 0);
+    opacity: 0.12;
+  }
+}
+@keyframes fitSlideInRight {
+  0% {
+    transform: translate3d(100%, 0, 0);
+    opacity: 0.12;
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+}
+
+/* Desplazamiento hacia la derecha (Semana anterior) */
+@keyframes fitSlideOutRight {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(100%, 0, 0);
+    opacity: 0.12;
+  }
+}
+@keyframes fitSlideInLeft {
+  0% {
+    transform: translate3d(-100%, 0, 0);
+    opacity: 0.12;
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+}
+
+.fit-anim-slide-out-left {
+  animation: fitSlideOutLeft 0.3s cubic-bezier(0.2, 0.9, 0.3, 1) forwards !important;
+  will-change: transform, opacity;
+}
+.fit-anim-slide-in-right {
+  animation: fitSlideInRight 0.3s cubic-bezier(0.2, 0.9, 0.3, 1) forwards !important;
+  will-change: transform, opacity;
+}
+.fit-anim-slide-out-right {
+  animation: fitSlideOutRight 0.3s cubic-bezier(0.2, 0.9, 0.3, 1) forwards !important;
+  will-change: transform, opacity;
+}
+.fit-anim-slide-in-left {
+  animation: fitSlideInLeft 0.3s cubic-bezier(0.2, 0.9, 0.3, 1) forwards !important;
+  will-change: transform, opacity;
+}
+
+/* Suavizado con micro-escala para la insignia de semana */
+@keyframes fitBadgeFade {
+  0% {
+    opacity: 0.25;
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.fit-anim-fade-cross {
+  animation: fitBadgeFade 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+/* Entrada suave con micro-elevación para los 3 diales */
+@keyframes fitDialsFadeIn {
+  0% {
+    opacity: 0.35;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fit-anim-dials-in {
+  animation: fitDialsFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fit-anim-slide-out-left,
+  .fit-anim-slide-in-right,
+  .fit-anim-slide-out-right,
+  .fit-anim-slide-in-left,
+  .fit-anim-fade-cross,
+  .fit-anim-dials-in {
+    animation: none !important;
+    transition: none !important;
   }
 }
 

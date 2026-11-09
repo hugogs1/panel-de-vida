@@ -561,8 +561,9 @@ function healthCard(state) {
         </div>
       </div>
 
-      <!-- Tira de los 7 días de la semana con mini-anillos Apple Fitness -->
-      <div class="fitness-days-strip weekly-mode">
+      <!-- Tira de los 7 días de la semana con mini-anillos Apple Fitness (con viewport para transición fluida de semanas) -->
+      <div class="fit-strip-viewport">
+        <div class="fitness-days-strip weekly-mode">
         ${historyDays.map(d => `
           <button class="fit-day-chip${d.isSelected ? " selected" : ""}${d.isFuture ? " is-future" : ""}${d.isToday ? " is-today" : ""}" type="button" 
             data-act="fit-select-day" data-date="${d.date}" aria-label="Ver actividad del ${d.name} ${d.dayNum}">
@@ -573,6 +574,7 @@ function healthCard(state) {
             <span class="fit-d-num num">${d.dayNum}</span>
           </button>
         `).join("")}
+      </div>
       </div>
 
       <!-- 3 Diales principales estilo Apple Fitness -->
@@ -1099,30 +1101,133 @@ export function openAdjustStepsModal(state, targetDate) {
   });
 }
 
-// Navegación interactiva de fechas de actividad: actualización 100% estática sin saltos de la barra
-function selectFitnessDate(root, newDate) {
+// Navegación interactiva de fechas de actividad: transición fluida estilo Apple Fitness
+function selectFitnessDate(root, newDate, forcedDirection = null) {
+  const prevDate = fitUI.selectedDate || iso();
+  const prevWeekOffset = (fitUI.weekOffset !== undefined && fitUI.weekOffset !== null)
+    ? fitUI.weekOffset
+    : getWeekOffsetForDate(prevDate);
+
+  const newWeekOffset = getWeekOffsetForDate(newDate);
+  const weekChanged = forcedDirection ? true : (prevWeekOffset !== newWeekOffset);
+  const direction = forcedDirection || (newWeekOffset > prevWeekOffset ? "next" : "prev");
+
   fitUI.selectedDate = newDate;
-  fitUI.weekOffset = getWeekOffsetForDate(newDate);
+  fitUI.weekOffset = newWeekOffset;
   try { sessionStorage.setItem("pv_fit_selected_date", newDate); } catch {}
 
   const bento = root.querySelector(".fitness-bento") || document.querySelector(".fitness-bento");
-  const strip = bento?.querySelector(".fitness-days-strip");
-  const currentScrollLeft = strip ? strip.scrollLeft : null;
-
-  if (bento) {
-    const tempDiv = document.createElement("div");
-    tempDiv.innerHTML = healthCard(getState());
-    const newBento = tempDiv.firstElementChild;
-    bento.replaceWith(newBento);
-
-    const newStrip = newBento.querySelector(".fitness-days-strip");
-    if (newStrip && currentScrollLeft !== null) {
-      newStrip.scrollLeft = currentScrollLeft;
-    }
+  if (!bento) {
+    window.dispatchEvent(new Event("pv:render"));
     return;
   }
 
-  window.dispatchEvent(new Event("pv:render"));
+  // Generamos el nuevo HTML de la tarjeta de salud
+  const tempDiv = document.createElement("div");
+  tempDiv.innerHTML = healthCard(getState());
+  const newBento = tempDiv.firstElementChild;
+  if (!newBento) {
+    window.dispatchEvent(new Event("pv:render"));
+    return;
+  }
+
+  // 1. Actualizar cabecera rápida de navegación (Ayer, Hoy, Mañana, título)
+  const oldHeader = bento.querySelector(".card-h");
+  const newHeader = newBento.querySelector(".card-h");
+  if (oldHeader && newHeader) {
+    oldHeader.innerHTML = newHeader.innerHTML;
+  }
+
+  // 2. Actualizar selector desplegable
+  const oldSelect = bento.querySelector("#fit-day-select");
+  if (oldSelect) {
+    oldSelect.value = newDate;
+  }
+
+  // 3. Actualizar barra de semana con suave cross-fade en la insignia
+  const oldWeekBar = bento.querySelector(".fit-week-bar");
+  const newWeekBar = newBento.querySelector(".fit-week-bar");
+  if (oldWeekBar && newWeekBar) {
+    oldWeekBar.innerHTML = newWeekBar.innerHTML;
+    if (weekChanged) {
+      const badge = oldWeekBar.querySelector(".fit-week-badge");
+      if (badge) badge.classList.add("fit-anim-fade-cross");
+    }
+  }
+
+  // 4. Actualizar tira de días con animación de carrusel fluido estilo Apple Fitness
+  const oldViewport = bento.querySelector(".fit-strip-viewport");
+  const newViewport = newBento.querySelector(".fit-strip-viewport");
+  const currentStrip = oldViewport ? oldViewport.querySelector(".fitness-days-strip") : bento.querySelector(".fitness-days-strip");
+  const incomingStrip = newViewport ? newViewport.querySelector(".fitness-days-strip") : newBento.querySelector(".fitness-days-strip");
+
+  if (oldViewport && currentStrip && incomingStrip) {
+    // Limpiar transiciones previas que pudieran estar activas
+    oldViewport.querySelectorAll(".fit-outgoing-strip").forEach(el => el.remove());
+
+    if (weekChanged) {
+      // Clon saliente para deslizarse suavemente fuera de pantalla
+      const outgoingStrip = currentStrip.cloneNode(true);
+      outgoingStrip.classList.add("fit-outgoing-strip");
+      oldViewport.appendChild(outgoingStrip);
+
+      // Colocar la nueva semana en el viewport
+      currentStrip.replaceWith(incomingStrip);
+
+      // Activar las animaciones físicas de deslizamiento con curva UIKit / Apple Fitness
+      if (direction === "next") {
+        outgoingStrip.classList.add("fit-anim-slide-out-left");
+        incomingStrip.classList.add("fit-anim-slide-in-right");
+      } else {
+        outgoingStrip.classList.add("fit-anim-slide-out-right");
+        incomingStrip.classList.add("fit-anim-slide-in-left");
+      }
+
+      let cleaned = false;
+      const cleanUp = () => {
+        if (cleaned) return;
+        cleaned = true;
+        outgoingStrip.remove();
+        incomingStrip.classList.remove("fit-anim-slide-in-right", "fit-anim-slide-in-left");
+      };
+      outgoingStrip.addEventListener("animationend", cleanUp, { once: true });
+      setTimeout(cleanUp, 360);
+    } else {
+      // Cambio de día dentro de la misma semana: actualización estática inmediata del círculo seleccionado sin mover la tira
+      currentStrip.querySelectorAll(".fit-day-chip").forEach(chip => {
+        if (chip.dataset.date === newDate) {
+          chip.classList.add("selected");
+        } else {
+          chip.classList.remove("selected");
+        }
+      });
+    }
+  } else if (currentStrip && incomingStrip) {
+    currentStrip.replaceWith(incomingStrip);
+  }
+
+  // 5. Actualizar los 3 diales principales con suave animación Apple fade-in
+  const oldDials = bento.querySelector(".fitness-dials-row");
+  const newDials = newBento.querySelector(".fitness-dials-row");
+  if (oldDials && newDials) {
+    newDials.classList.add("fit-anim-dials-in");
+    oldDials.replaceWith(newDials);
+    setTimeout(() => {
+      newDials.classList.remove("fit-anim-dials-in");
+    }, 320);
+  }
+
+  // 6. Actualizar panel de detalle del día
+  const oldPanel = bento.querySelector(".fit-selected-day-panel");
+  const newPanel = newBento.querySelector(".fit-selected-day-panel");
+  if (oldPanel && newPanel) {
+    oldPanel.replaceWith(newPanel);
+  } else if (!oldPanel && newPanel) {
+    const parentContainer = bento.querySelector(".fitness-dials-row")?.parentNode || bento;
+    parentContainer.appendChild(newPanel);
+  } else if (oldPanel && !newPanel) {
+    oldPanel.remove();
+  }
 }
 
 // ---------- Modal Centro de Sincronización (Salud, Xiaomi y Hevy)
@@ -1351,26 +1456,26 @@ export function mount(root, _state, signal) {
   let touchStartX = 0;
   let touchStartY = 0;
   root.addEventListener("touchstart", e => {
-    const strip = e.target.closest(".fitness-days-strip.weekly-mode");
+    const strip = e.target.closest(".fit-strip-viewport, .fitness-days-strip.weekly-mode");
     if (!strip) return;
     touchStartX = e.touches[0].clientX;
     touchStartY = e.touches[0].clientY;
   }, { passive: true, signal });
 
   root.addEventListener("touchend", e => {
-    const strip = e.target.closest(".fitness-days-strip.weekly-mode");
+    const strip = e.target.closest(".fit-strip-viewport, .fitness-days-strip.weekly-mode");
     if (!strip) return;
     const dx = e.changedTouches[0].clientX - touchStartX;
     const dy = e.changedTouches[0].clientY - touchStartY;
-    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.4) {
       if (dx < 0) {
-        // Deslizar hacia la izquierda -> Semana siguiente
+        // Deslizar hacia la izquierda -> Semana siguiente con animación física a la izquierda
         const cur = fitUI.selectedDate || iso();
-        selectFitnessDate(root, iso(addDays(parseISO(cur), 7)));
+        selectFitnessDate(root, iso(addDays(parseISO(cur), 7)), "next");
       } else {
-        // Deslizar hacia la derecha -> Semana anterior
+        // Deslizar hacia la derecha -> Semana anterior con animación física a la derecha
         const cur = fitUI.selectedDate || iso();
-        selectFitnessDate(root, iso(addDays(parseISO(cur), -7)));
+        selectFitnessDate(root, iso(addDays(parseISO(cur), -7)), "prev");
       }
     }
   }, { passive: true, signal });
@@ -1398,20 +1503,18 @@ export function mount(root, _state, signal) {
         return;
       }
       if (fitBtn.dataset.act === "fit-prev-week") {
-        fitUI.weekOffset = (fitUI.weekOffset || 0) - 1;
         const cur = fitUI.selectedDate || iso();
-        selectFitnessDate(root, iso(addDays(parseISO(cur), -7)));
+        selectFitnessDate(root, iso(addDays(parseISO(cur), -7)), "prev");
         return;
       }
       if (fitBtn.dataset.act === "fit-next-week") {
-        fitUI.weekOffset = (fitUI.weekOffset || 0) + 1;
         const cur = fitUI.selectedDate || iso();
-        selectFitnessDate(root, iso(addDays(parseISO(cur), 7)));
+        selectFitnessDate(root, iso(addDays(parseISO(cur), 7)), "next");
         return;
       }
       if (fitBtn.dataset.act === "fit-current-week") {
-        fitUI.weekOffset = 0;
-        selectFitnessDate(root, iso());
+        const curOffset = fitUI.weekOffset || 0;
+        selectFitnessDate(root, iso(), curOffset > 0 ? "prev" : "next");
         return;
       }
       if (fitBtn.dataset.act === "fit-prev-day") {
