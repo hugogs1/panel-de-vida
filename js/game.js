@@ -11,7 +11,8 @@ import { meets } from "./habits.js";
 export const AREAS = {
   fin:  { key: "fin",  name: "Finanzas",           short: "Finanzas", color: "var(--fin)",    hex: "#7fcf9b", route: "finanzas" },
   hab:  { key: "hab",  name: "Hábitos y deporte",  short: "Hábitos",  color: "var(--hab)",    hex: "#e88fb4", route: "habitos" },
-  ag:   { key: "ag",   name: "Agenda y tareas",    short: "Agenda",   color: "var(--agenda)", hex: "#e0b467", route: "agenda" }
+  ag:   { key: "ag",   name: "Agenda y tareas",    short: "Agenda",   color: "var(--agenda)", hex: "#e0b467", route: "agenda" },
+  work: { key: "work", name: "Trabajo y estudio",  short: "Trabajo",  color: "var(--cyan)",   hex: "#00F0FF", route: "resumen" }
 };
 
 // ---------- Niveles y títulos
