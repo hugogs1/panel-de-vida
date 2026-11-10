@@ -22,6 +22,102 @@
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/desktop.css">
+
+  <script>
+    // 1. Registro inmediato de Service Worker y comprobación de actualización al inicio
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      var hadController = !!navigator.serviceWorker.controller;
+      var reloading = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function() {
+        if (!hadController || reloading) return;
+        reloading = true;
+        try { sessionStorage.setItem('pv-updated', '1'); } catch (e) {}
+        location.reload();
+      });
+      navigator.serviceWorker.register('sw.js').then(function(reg) {
+        window.__pvSwReg = reg;
+        reg.update().catch(function() {});
+        document.addEventListener('visibilitychange', function() {
+          if (document.visibilityState === 'visible') reg.update().catch(function() {});
+        });
+      }).catch(function(err) { console.error('SW reg error:', err); });
+    }
+
+    // 2. Pantalla de auto-recuperación si falla la carga o se congela la caché vieja
+    function showRecovery(msg) {
+      var view = document.getElementById('view');
+      if (!view) return;
+      view.innerHTML = '<div style="padding:32px 20px;text-align:center;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">' +
+        '<div style="font-size:38px;margin-bottom:12px">⚡</div>' +
+        '<h2 style="font-size:18px;margin:0 0 8px;font-weight:700">Actualizando Panel de Vida</h2>' +
+        '<p style="color:#8E8E93;font-size:13px;line-height:1.5;margin:0 0 20px">' +
+        (msg ? '<span style="color:#FF453A;display:block;margin-bottom:10px;font-size:12px">' + msg + '</span>' : '') +
+        'Se ha publicado una versión nueva. Pulsa para limpiar la memoria caché y abrir la app al instante.' +
+        '</p>' +
+        '<button id="btn-force-reload" type="button" style="background:#00F0FF;color:#000;font-weight:700;font-size:14px;border:none;border-radius:12px;padding:14px 22px;cursor:pointer;width:100%;max-width:300px;box-shadow:0 4px 18px rgba(0,240,255,0.35);">' +
+        '🔄 Limpiar caché y cargar versión nueva' +
+        '</button>' +
+        '</div>';
+      var btn = document.getElementById('btn-force-reload');
+      if (btn) {
+        btn.onclick = function() {
+          btn.textContent = 'Actualizando...';
+          btn.disabled = true;
+          if ('caches' in window) {
+            caches.keys().then(function(keys) {
+              return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+            }).then(function() {
+              if ('serviceWorker' in navigator) {
+                return navigator.serviceWorker.getRegistrations().then(function(regs) {
+                  return Promise.all(regs.map(function(r) { return r.unregister(); }));
+                });
+              }
+            }).finally(function() {
+              location.replace(location.pathname + '?nocache=' + Date.now() + location.hash);
+            });
+          } else {
+            location.reload();
+          }
+        };
+      }
+    }
+
+    // 3. Captura global de errores de ejecución
+    window.addEventListener('error', function(e) {
+      console.error('Global error:', e);
+      var view = document.getElementById('view');
+      if (view && (!view.children || view.children.length === 0)) {
+        showRecovery('Aviso de carga: ' + (e.message || 'Error en script'));
+      }
+    });
+
+    window.addEventListener('unhandledrejection', function(e) {
+      console.error('Unhandled rejection:', e);
+      var view = document.getElementById('view');
+      if (view && (!view.children || view.children.length === 0)) {
+        showRecovery('Aviso de carga: ' + (e.reason && e.reason.message ? e.reason.message : 'Error inesperado'));
+      }
+    });
+
+    // 4. Watchdog: si tras 2 segundos el contenedor principal sigue en blanco, intenta auto-recuperar
+    setTimeout(function() {
+      var view = document.getElementById('view');
+      if (view && (!view.children || view.children.length === 0) && !view.innerHTML.trim()) {
+        var autoKey = 'pv_autorefresh_' + (new Date().toISOString().slice(0, 10));
+        var count = parseInt(sessionStorage.getItem(autoKey) || '0', 10);
+        if (count < 1 && 'caches' in window) {
+          sessionStorage.setItem(autoKey, String(count + 1));
+          caches.keys().then(function(keys) {
+            return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+          }).then(function() {
+            location.reload();
+          });
+        } else {
+          showRecovery('La pantalla tardó demasiado en responder.');
+        }
+      }
+    }, 2000);
+  </script>
 </head>
 <body>
   <div class="app">
@@ -56,6 +152,6 @@
   <div id="toast-root" aria-live="assertive"></div>
 
   <noscript>Esta app necesita JavaScript activado.</noscript>
-  <script type="module" src="js/app.js"></script>
+  <script type="module" src="js/app.js?v=0.40.0"></script>
 </body>
 </html>

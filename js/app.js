@@ -237,29 +237,15 @@ start().catch(err => {
   viewEl.innerHTML = `<div class="card"><h2 class="card-h">No se pudo abrir la app</h2><p class="muted">${String(err.message || err)}</p></div>`;
 });
 
-// Modo sin conexión y actualizaciones automáticas
+// Modo sin conexión y notificaciones de actualización
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
-  const hadController = !!navigator.serviceWorker.controller;
-  let reloading = false;
-  // Cuando se publica una versión nueva, el service worker la instala y la app se recarga sola
-  navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (!hadController || reloading) return;
-    reloading = true;
-    try { sessionStorage.setItem("pv-updated", "1"); } catch { /* sin almacenamiento */ }
-    location.reload();
-  });
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js").then(reg => {
-      // Comprobar actualización de forma inmediata al abrir la app
-      reg.update().catch(() => {});
-      // Comprobar si hay versión nueva cada vez que la app vuelve a primer plano
-      document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
-    }).catch(console.error);
-  });
+  if (!window.__pvSwReg) {
+    navigator.serviceWorker.register("sw.js").catch(console.error);
+  }
   try {
     if (sessionStorage.getItem("pv-updated")) {
       sessionStorage.removeItem("pv-updated");
-      setTimeout(() => toast("App actualizada a la última versión"), 600);
+      setTimeout(() => toast("App actualizada a la última versión (v0.40.0)"), 600);
     }
   } catch { /* sin almacenamiento */ }
 }
