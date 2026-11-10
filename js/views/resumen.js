@@ -657,6 +657,9 @@ function healthCard(state) {
               <button class="btn small primary" type="button" data-act="fit-adjust-steps" style="background:linear-gradient(135deg, #FA114F, #FF2442);border:none;color:#fff;font-weight:700;font-size:11px">
                 ✏️ ${isFuture ? "Planificar entreno" : "Ajustar actividad"}
               </button>
+              <button class="btn small danger" type="button" data-act="fit-delete-day" style="font-size:11px" title="Borrar toda la actividad de este día">
+                🗑️ Borrar día
+              </button>
               <button class="btn small link-btn" type="button" data-act="fit-today" style="font-size:11px">Volver a Hoy →</button>
             </div>
           </div>
@@ -1007,9 +1010,12 @@ export function openAdjustStepsModal(state, targetDate) {
         </label>
       </div>
 
-      <div class="btn-row" style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
-        <button class="btn" type="button" data-close>Cancelar</button>
-        <button class="btn primary" type="submit" style="background:linear-gradient(135deg, #FA114F, #FF5252);border:none;color:#fff;font-weight:700">💾 Guardar en memoria</button>
+      <div class="btn-row" style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:4px">
+        <button class="btn danger" type="button" id="btn-clear-day-act">🗑️ Borrar actividad</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn" type="button" data-close>Cancelar</button>
+          <button class="btn primary" type="submit" style="background:linear-gradient(135deg, #FA114F, #FF5252);border:none;color:#fff;font-weight:700">💾 Guardar</button>
+        </div>
       </div>
     </form>
   `, {
@@ -1017,6 +1023,26 @@ export function openAdjustStepsModal(state, targetDate) {
       const inp = s.querySelector("#inp-steps");
       inp?.focus();
       inp?.select();
+
+      s.querySelector("#btn-clear-day-act")?.addEventListener("click", async () => {
+        const saveDate = s.querySelector("#inp-target-date")?.value || targetDate;
+        const ok = await confirmSheet({
+          title: "¿Borrar actividad de este día?",
+          text: `Se eliminarán los pasos, entrenamientos y deportes registrados el ${shortDate(saveDate)}.`,
+          ok: "Borrar todo",
+          danger: true
+        });
+        if (!ok) return;
+        update(st => {
+          let h = st.habits.habits.find(x => x.id === "hb-pasos-salud" || /paso/i.test(x.name || ""));
+          if (h) setHabitValue(st, h.id, saveDate, 0);
+          st.habits.workouts = (st.habits.workouts || []).filter(w => w.date !== saveDate);
+        });
+        fitUI.selectedDate = saveDate;
+        closeSheet();
+        toast(`Actividad del ${shortDate(saveDate)} borrada`);
+        window.dispatchEvent(new Event("pv:render"));
+      });
       s.querySelector("#form-adjust-steps")?.addEventListener("submit", e => {
         e.preventDefault();
         const saveDate = s.querySelector("#inp-target-date")?.value || targetDate;
@@ -1579,6 +1605,24 @@ export function mount(root, _state, signal) {
       if (fitBtn.dataset.act === "fit-adjust-steps") {
         const activeDate = fitUI.selectedDate || iso();
         openAdjustStepsModal(getState(), activeDate);
+        return;
+      }
+      if (fitBtn.dataset.act === "fit-delete-day") {
+        const activeDate = fitUI.selectedDate || iso();
+        const ok = await confirmSheet({
+          title: "¿Borrar actividad de este día?",
+          text: `Se eliminarán todos los pasos y entrenamientos registrados el ${shortDate(activeDate)}.`,
+          ok: "Borrar actividad",
+          danger: true
+        });
+        if (!ok) return;
+        update(st => {
+          let h = st.habits.habits.find(x => x.id === "hb-pasos-salud" || /paso/i.test(x.name || ""));
+          if (h) setHabitValue(st, h.id, activeDate, 0);
+          st.habits.workouts = (st.habits.workouts || []).filter(w => w.date !== activeDate);
+        });
+        toast(`Actividad del ${shortDate(activeDate)} borrada`);
+        window.dispatchEvent(new Event("pv:render"));
         return;
       }
       if (fitBtn.dataset.act === "cal-mini-month") {

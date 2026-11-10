@@ -2,7 +2,7 @@
 // navegación de mes y año, anotación rápida y recuadro de próximas fechas registradas.
 
 import { areaHeader } from "./area.js";
-import { esc, toast } from "../ui.js";
+import { esc, toast, confirmSheet } from "../ui.js";
 import { icon } from "../icons.js";
 import { iso, parseISO, addDays, weekStart } from "../stats.js";
 import { update } from "../state.js";
@@ -267,6 +267,9 @@ function mesTab(state) {
       ${events.length || tasks.length ? `
         ${events.length ? `<div class="list" style="margin-bottom:8px">${events.map(eventRow).join("")}</div>` : ""}
         ${tasks.length ? `<div class="list">${tasks.map(t => taskRow(t, { showDate: false })).join("")}</div>` : ""}
+        <div style="display:flex;justify-content:flex-end;margin-top:6px">
+          <button class="btn small link-btn danger" type="button" data-act="clear-day-agenda" style="font-size:11px">🗑️ Borrar tareas y eventos de este día</button>
+        </div>
       ` : `
         <div class="empty" style="padding:12px;text-align:center">
           Nada programado para este día.<br>
@@ -517,6 +520,23 @@ export function mount(root, _state, signal) {
       case "quick-add-hour": openEventForm({ date: b.dataset.date, time: b.dataset.hour }); break;
       case "edit-task": openTaskForm({ id }); break;
       case "edit-event": openEventForm({ id }); break;
+      case "clear-day-agenda": {
+        confirmSheet({
+          title: `¿Borrar agenda del ${shortDate(ui.day)}?`,
+          text: "Se eliminarán todas las tareas y eventos registrados en este día.",
+          ok: "Borrar día",
+          danger: true
+        }).then(ok => {
+          if (!ok) return;
+          update(st => {
+            st.agenda.tasks = (st.agenda.tasks || []).filter(t => t.due !== ui.day);
+            st.agenda.events = (st.agenda.events || []).filter(e => e.date !== ui.day);
+          });
+          toast(`Agenda del ${shortDate(ui.day)} borrada`);
+          rerender();
+        });
+        break;
+      }
       case "export": openExport(); break;
     }
   }, { signal });

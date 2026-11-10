@@ -1,7 +1,7 @@
 // Hábitos y deporte: hábitos con rachas, gimnasio, fútbol, cuerpo y bienestar.
 
 import { areaHeader } from "./area.js";
-import { esc, openSheet, toast } from "../ui.js";
+import { esc, openSheet, closeSheet, toast, confirmSheet } from "../ui.js";
 import { icon } from "../icons.js";
 import { iso, addDays, parseISO } from "../stats.js";
 import { heatmap, stackChart, ring } from "../charts.js";
@@ -165,18 +165,39 @@ function recordsZone(recs) {
 }
 const searchKey = t => String(t).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-// Detalle de un entreno importado de Hevy (solo lectura: se edita en Hevy)
+// Detalle de un entreno importado de Hevy (con opción de borrar)
 function viewWorkout(state, id) {
   const w = state.habits.workouts.find(x => x.id === id);
   if (!w) return;
   const setTxt = st => `${num(st.w)} kg × ${st.r}${st.t === "warmup" ? " (calentamiento)" : st.t === "failure" ? " (al fallo)" : st.t === "dropset" ? " (drop set)" : ""}`;
-  openSheet(`
+  const sheet = openSheet(`
     <h2>${esc(w.title || "Entreno")}</h2>
-    <p>${dayName(w.date)}${w.minutes ? ` · ${w.minutes} min` : ""} · ${num(workoutVolume(w) / 1000)} t · importado de Hevy</p>
-    <div class="wo-view">${w.exercises.map(ex => `
-      <div class="wo-ex"><b>${esc(ex.name)}</b><ol>${ex.sets.map(st => `<li class="num${st.t === "warmup" ? " warm" : ""}">${setTxt(st)}</li>`).join("")}</ol></div>`).join("")}</div>
-    <p class="hint">Para cambiarlo, edítalo en Hevy y vuelve a importar.</p>
-    <button class="btn primary" type="button" data-close>Cerrar</button>`);
+    <p>${dayName(w.date)}${w.minutes ? ` · ${w.minutes} min` : ""} · ${num(workoutVolume(w) / 1000)} t · ${w.source === "hevy" ? "importado de Hevy" : "registrado"}</p>
+    <div class="wo-view">${(w.exercises || []).map(ex => `
+      <div class="wo-ex"><b>${esc(ex.name)}</b><ol>${(ex.sets || []).map(st => `<li class="num${st.t === "warmup" ? " warm" : ""}">${setTxt(st)}</li>`).join("")}</ol></div>`).join("")}</div>
+    <div class="btn-row" style="margin-top:16px;display:flex;justify-content:space-between">
+      <button class="btn danger" type="button" id="del-hevy-wo">🗑️ Borrar entreno</button>
+      <button class="btn primary" type="button" data-close>Cerrar</button>
+    </div>
+  `, {
+    onOpen: s => {
+      s.querySelector("#del-hevy-wo")?.addEventListener("click", async () => {
+        const ok = await confirmSheet({
+          title: "¿Borrar este entreno?",
+          text: `Se eliminará el entreno del ${shortDate(w.date)}. Esta acción no se puede deshacer.`,
+          ok: "Borrar entreno",
+          danger: true
+        });
+        if (!ok) return;
+        update(st => {
+          st.habits.workouts = (st.habits.workouts || []).filter(x => x.id !== w.id);
+        });
+        closeSheet();
+        toast("Entreno borrado");
+        window.dispatchEvent(new Event("pv:render"));
+      });
+    }
+  });
 }
 
 

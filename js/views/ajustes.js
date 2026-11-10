@@ -11,7 +11,7 @@ import { syncCard, mountSyncCard } from "./sync-ui.js";
 import { atajosCard, mountAtajosCard } from "./atajos.js";
 import { hevyCard, mountHevyCard } from "./hevy-ui.js";
 import { syncConfigured } from "../sync.js";
-import { hasAnyData } from "../stats.js";
+import { hasAnyData, iso } from "../stats.js";
 
 const fmt = iso => iso ? new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)) : "Nunca";
 const isStandalone = () => (typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(display-mode: standalone)").matches) || (typeof navigator !== "undefined" && navigator.standalone === true);
@@ -69,6 +69,8 @@ export function render(state) {
 
     ${hevyCard(state)}
 
+    ${dataManagementCard(state)}
+
     ${demoCard(state)}
 
     <section class="card">
@@ -80,6 +82,69 @@ export function render(state) {
       </div>
       <div class="btn-row" style="margin-top:12px">
         <button class="btn danger" type="button" id="wipe">Borrar todos los datos</button>
+      </div>
+    </section>`;
+}
+
+function dataManagementCard(state) {
+  const fitnessCount = (state.habits.workouts || []).length;
+  const financeCount = (state.finance.transactions || []).length;
+  const agendaTasksCount = (state.agenda.tasks || []).length;
+  const agendaEventsCount = (state.agenda.events || []).length;
+  const habitsLogsCount = (state.habits.logs || []).length;
+
+  return `
+    <section class="card">
+      <h2 class="card-h">Gestión y borrado manual de datos</h2>
+      <p class="muted" style="font-size:13px;line-height:1.5;margin:6px 0 14px">
+        Elimina datos de apartados concretos o de un día en específico sin tocar el resto de la app.
+      </p>
+
+      <!-- Borrar por fecha concreta -->
+      <div style="background:rgba(255,255,255,0.035);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:12px;margin-bottom:14px">
+        <b style="font-size:12.5px;display:flex;align-items:center;gap:6px;color:#fff;margin-bottom:4px">
+          <span>📅</span> Borrar registros de una fecha concreta
+        </b>
+        <p class="muted" style="font-size:11px;margin-bottom:8px">Limpia pasos, entrenamientos, tareas y gastos que coincidan con el día elegido.</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="date" id="del-date-input" value="${iso()}" class="input" style="padding:6px 10px;font-size:12px;border-radius:8px">
+          <button class="btn small danger" type="button" id="btn-del-by-date">🗑️ Borrar este día</button>
+        </div>
+      </div>
+
+      <!-- Borrar por apartado -->
+      <div class="list" style="gap:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05)">
+          <div>
+            <b style="font-size:12.5px;display:flex;align-items:center;gap:6px;color:#fff"><span>👟</span> Fitness y Deportes</b>
+            <small class="muted" style="font-size:11px">${fitnessCount} entrenos · historial de pasos</small>
+          </div>
+          <button class="btn small danger" type="button" id="btn-del-fitness">Borrar fitness</button>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05)">
+          <div>
+            <b style="font-size:12.5px;display:flex;align-items:center;gap:6px;color:#fff"><span>💰</span> Finanzas (Movimientos)</b>
+            <small class="muted" style="font-size:11px">${financeCount} movimientos (mantiene tus cuentas)</small>
+          </div>
+          <button class="btn small danger" type="button" id="btn-del-finance">Borrar gastos</button>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05)">
+          <div>
+            <b style="font-size:12.5px;display:flex;align-items:center;gap:6px;color:#fff"><span>📅</span> Agenda</b>
+            <small class="muted" style="font-size:11px">${agendaTasksCount} tareas · ${agendaEventsCount} eventos</small>
+          </div>
+          <button class="btn small danger" type="button" id="btn-del-agenda">Borrar agenda</button>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05)">
+          <div>
+            <b style="font-size:12.5px;display:flex;align-items:center;gap:6px;color:#fff"><span>🔁</span> Historial de Hábitos</b>
+            <small class="muted" style="font-size:11px">${habitsLogsCount} registros diarios de hábitos</small>
+          </div>
+          <button class="btn small danger" type="button" id="btn-del-habits">Borrar hábitos</button>
+        </div>
       </div>
     </section>`;
 }
@@ -104,6 +169,97 @@ export function mount(root) {
   mountSyncCard(root);
   mountAtajosCard(root);
   mountHevyCard(root);
+
+  // Borrado manual por fecha concreta
+  root.querySelector("#btn-del-by-date")?.addEventListener("click", async () => {
+    const d = root.querySelector("#del-date-input")?.value;
+    if (!d) return;
+    const ok = await confirmSheet({
+      title: `¿Borrar todos los datos del ${d}?`,
+      text: "Se eliminarán los pasos, entrenamientos, tareas, eventos y gastos registrados en esta fecha exacta.",
+      ok: "Borrar día",
+      danger: true
+    });
+    if (!ok) return;
+    update(st => {
+      st.habits.workouts = (st.habits.workouts || []).filter(w => w.date !== d);
+      st.habits.logs = (st.habits.logs || []).filter(l => l.date !== d);
+      st.agenda.tasks = (st.agenda.tasks || []).filter(t => t.due !== d);
+      st.agenda.events = (st.agenda.events || []).filter(e => e.date !== d);
+      st.finance.transactions = (st.finance.transactions || []).filter(t => t.date !== d);
+      if (st.habits.sleep) st.habits.sleep = st.habits.sleep.filter(s => s.date !== d);
+      if (st.habits.nutrition) st.habits.nutrition = st.habits.nutrition.filter(n => n.date !== d);
+      if (st.habits.body) st.habits.body = st.habits.body.filter(b => b.date !== d);
+    });
+    toast(`Datos del ${d} eliminados`);
+    window.dispatchEvent(new Event("pv:render"));
+  });
+
+  // Borrado manual de Fitness
+  root.querySelector("#btn-del-fitness")?.addEventListener("click", async () => {
+    const ok = await confirmSheet({
+      title: "¿Borrar todos los datos de Fitness?",
+      text: "Se eliminarán todos los entrenamientos de gimnasio, deportes y el historial de pasos. Esta acción no se puede deshacer.",
+      ok: "Borrar Fitness",
+      danger: true
+    });
+    if (!ok) return;
+    update(st => {
+      st.habits.workouts = [];
+      st.habits.logs = (st.habits.logs || []).filter(l => l.habitId !== "hb-pasos-salud");
+    });
+    toast("Datos de fitness eliminados");
+    window.dispatchEvent(new Event("pv:render"));
+  });
+
+  // Borrado manual de Finanzas
+  root.querySelector("#btn-del-finance")?.addEventListener("click", async () => {
+    const ok = await confirmSheet({
+      title: "¿Borrar todos los movimientos?",
+      text: "Se eliminarán todos los gastos e ingresos registrados. Tus cuentas y presupuestos se mantendrán.",
+      ok: "Borrar movimientos",
+      danger: true
+    });
+    if (!ok) return;
+    update(st => {
+      st.finance.transactions = [];
+    });
+    toast("Movimientos de finanzas eliminados");
+    window.dispatchEvent(new Event("pv:render"));
+  });
+
+  // Borrado manual de Agenda
+  root.querySelector("#btn-del-agenda")?.addEventListener("click", async () => {
+    const ok = await confirmSheet({
+      title: "¿Borrar toda la Agenda?",
+      text: "Se eliminarán todas las tareas pendientes, completadas y los eventos del calendario.",
+      ok: "Borrar Agenda",
+      danger: true
+    });
+    if (!ok) return;
+    update(st => {
+      st.agenda.tasks = [];
+      st.agenda.events = [];
+    });
+    toast("Agenda eliminada");
+    window.dispatchEvent(new Event("pv:render"));
+  });
+
+  // Borrado manual de Hábitos
+  root.querySelector("#btn-del-habits")?.addEventListener("click", async () => {
+    const ok = await confirmSheet({
+      title: "¿Borrar historial de hábitos?",
+      text: "Se eliminarán los registros diarios de cumplimiento. La configuración de tus hábitos se mantendrá.",
+      ok: "Borrar registros",
+      danger: true
+    });
+    if (!ok) return;
+    update(st => {
+      st.habits.logs = [];
+    });
+    toast("Historial de hábitos eliminado");
+    window.dispatchEvent(new Event("pv:render"));
+  });
   root.querySelector("#demo-on")?.addEventListener("click", async () => {
     await replaceState(buildDemo(getState().profile.alias));
     toast("Datos de ejemplo cargados");
