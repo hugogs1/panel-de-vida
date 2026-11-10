@@ -1,7 +1,7 @@
 // Pantalla Principal: Agenda Diaria, Bento Grid, Pulso de Salud y Cartera Inteligente.
 
 import { AREAS, levelFromXp, titleFor } from "../game.js";
-import { esc, int, money as eur, longDate, monthName, toast, openSheet, closeSheet } from "../ui.js";
+import { esc, int, money as eur, longDate, monthName, toast, openSheet, closeSheet, confirmSheet } from "../ui.js";
 import { icon } from "../icons.js";
 import { backupDue } from "../backup.js";
 import { update, getState } from "../state.js";
@@ -1546,7 +1546,7 @@ export function mount(root, _state, signal) {
     }
   }
 
-  root.addEventListener("click", e => {
+  root.addEventListener("click", async e => {
     const wc = e.target.closest("[data-act=weekly-close]");
     if (wc) { closeWeekly(wc.dataset.ws); toast("Lo tienes cuando quieras en «Semanas»"); return; }
     
