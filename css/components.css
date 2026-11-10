@@ -202,6 +202,7 @@
   background: rgba(0, 0, 0, .6);
   -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
   animation: fade .2s ease-out;
+  transition: opacity .2s ease;
 }
 .sheet {
   position: fixed; z-index: 41; left: 0; right: 0; bottom: 0;
@@ -212,10 +213,70 @@
   box-shadow: 0 -10px 40px rgba(0, 0, 0, .5);
   display: grid; gap: 14px;
   animation: slideup .25s cubic-bezier(.2, .8, .2, 1);
+  will-change: transform, opacity;
+  touch-action: pan-y;
 }
-.sheet .grabber { width: 40px; height: 4px; border-radius: 4px; background: var(--line); margin: 0 auto 2px; }
-.sheet h2 { margin: 0; font-size: var(--fs-lg); font-weight: 700; }
+.sheet .grabber {
+  width: 44px;
+  height: 5px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.22);
+  margin: 0 auto 4px;
+  cursor: grab;
+  touch-action: none;
+  transition: background .15s ease, transform .15s ease;
+}
+.sheet .grabber:active {
+  background: rgba(255, 255, 255, 0.45);
+  transform: scaleY(1.2);
+}
+.sheet-close-btn {
+  position: absolute;
+  top: 13px;
+  right: 15px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all .15s ease;
+  z-index: 20;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+.sheet-close-btn:hover, .sheet-close-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: scale(1.08);
+}
+.sheet-close-btn:active {
+  transform: scale(0.92);
+}
+.sheet h2 {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  padding-right: 36px; /* Evita que títulos largos solapen con el botón X */
+}
 .sheet p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+
+.sheet.sheet-closing {
+  transform: translateY(100%) !important;
+  opacity: 0 !important;
+  transition: transform .2s cubic-bezier(.2, .8, .2, 1), opacity .2s ease !important;
+}
+.sheet-backdrop.backdrop-closing {
+  opacity: 0 !important;
+  transition: opacity .2s ease !important;
+}
+
 @keyframes slideup { from { transform: translateY(100%); } to { transform: none; } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 
