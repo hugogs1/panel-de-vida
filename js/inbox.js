@@ -144,12 +144,14 @@ export function applyInbox(s, messages, today = iso()) {
       s.work.entries.push({ id, date: parseDay(m.fecha, today) || today, minutes, kind, projectId: p?.id || null, note: m.nota || "", source: "siri" });
       done.push(`${minutes >= 60 ? `${String(Math.round(minutes / 6) / 10).replace(".", ",")} h` : `${minutes} min`} de ${kind}`);
     } else if (tipo === "gimnasio" || tipo === "gym" || tipo === "fuerza" || tipo === "pesas" || tipo === "hevy" || tipo === "futbol" || tipo === "entreno" || tipo === "deporte" || tipo === "actividad" || tipo === "caminar" || tipo === "andar" || tipo === "paseo" || tipo === "correr" || tipo === "workout") {
-      let rawMin = num(m.minutos || m.duracion || m.tiempo || m.mins || m.duration);
+      const rawValStr = String(m.minutos ?? m.duracion ?? m.tiempo ?? m.mins ?? m.duration ?? "").trim().toLowerCase();
+      const isDelete = rawValStr === "0" || rawValStr === "borrar" || rawValStr === "descanso" || rawValStr === "eliminar" || rawValStr === "cancelar";
+      let rawMin = num(rawValStr);
       if (Number.isFinite(rawMin) && rawMin > 500) {
         // Si supera 500, viene en segundos desde Apple Health / Atajos (ej. 3600 s = 60 min, 3120 s = 52 min)
         rawMin = Math.round(rawMin / 60);
       }
-      const minutes = Math.max(1, Math.round(rawMin)) || (tipo === "futbol" ? 90 : 60);
+      const minutes = isDelete ? 0 : (Math.max(1, Math.round(rawMin)) || (tipo === "futbol" ? 90 : 60));
       const date = parseDay(m.fecha, today) || today;
       const rawName = String(m.nombre || m.titulo || m.actividad || m.title || m.workout || (tipo === "caminar" || tipo === "andar" || tipo === "paseo" ? "Caminata" : (tipo === "correr" ? "Running" : (tipo === "gimnasio" || tipo === "gym" || tipo === "fuerza" || tipo === "pesas" || tipo === "hevy" ? "Gimnasio" : "Entreno")))).trim();
       const nName = norm(rawName);
@@ -166,7 +168,10 @@ export function applyInbox(s, messages, today = iso()) {
         || /hevy|fuerza|strength/i.test(String(m.origen || m.app || m.fuente || m.nota || ""))
         || (tipo === "entreno" && !/tenis|padel|natacion|basket|baloncesto|yoga|pilates/i.test(nName));
 
-      if (isFutbol) {
+      if (isDelete) {
+        s.habits.workouts = (s.habits.workouts || []).filter(w => !(w.date === date && (isGym ? (w.type === "gym" || (!w.type && !w.sport)) : (w.type === "deporte" || w.sport === nName))));
+        done.push(`entreno del ${date} eliminado`);
+      } else if (isFutbol) {
         s.habits.workouts.push({ id, date, type: "futbol", sport: "futbol", kind: ["si", "sí", "partido"].includes(norm(m.partido)) ? "partido" : "entrenamiento", minutes, title: "Fútbol", note: m.nota || "", source: "salud" });
         done.push(`fútbol ${minutes} min`);
       } else if (isWalking) {

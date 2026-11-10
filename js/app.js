@@ -96,6 +96,7 @@ function handleDirectSync() {
       "0", 10
     );
     if (rawGym > 500) rawGym = Math.round(rawGym / 60); // Conversión automática de segundos a minutos si viene en segundos
+    const isGymZero = params.get("gym") === "0" || params.get("gym") === "descanso" || params.has("borrar_gym") || params.has("del_gym");
     const gymMin = rawGym;
     const gymTitle = params.get("gym_title") || params.get("titulo") || params.get("title") || params.get("actividad") || "Entrenamiento de fuerza (Hevy)";
     const deporte = params.get("deporte") || params.get("sport") || "";
@@ -123,7 +124,9 @@ function handleDirectSync() {
         setHabitValue(s, h.id, fecha, pasos);
       }
 
-      if (gymMin > 0) {
+      if (isGymZero) {
+        s.habits.workouts = (s.habits.workouts || []).filter(w => !(w.date === fecha && (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym")));
+      } else if (gymMin > 0) {
         s.habits.workouts ||= [];
         const existing = s.habits.workouts.find(w => w.date === fecha && (w.type === "gym" || (!w.type && !w.sport)) && (!w.sport || w.sport === "gym"));
         if (existing) {
