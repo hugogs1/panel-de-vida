@@ -386,6 +386,126 @@ export function parseBankCSV(text, existingTxs = []) {
 }
 
 /**
+ * Parsea un archivo de extracto bancario en formato PDF (como los de ING, BBVA, Santander, etc.)
+ */
+export async function parseBankPDF(arrayBuffer, existingTxs = []) {
+  if (typeof window !== "undefined" && typeof window.pdfjsLib === "undefined") {
+    await new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "js/vendor/pdf.min.js";
+      script.onload = resolve;
+      script.onerror = () => reject(new Error("No se pudo cargar el motor lector de PDF"));
+      document.head.appendChild(script);
+    });
+  }
+
+  const pdfjsLib = typeof window !== "undefined" ? window.pdfjsLib : (await import("file:///c:/Users/truen/Dropbox/PC/Desktop/PROYECTOS/panel de vida/js/vendor/pdf.min.js")).default;
+  if (typeof window !== "undefined" && pdfjsLib?.GlobalWorkerOptions) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "js/vendor/pdf.worker.min.js";
+  }
+
+  const doc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+  const rows = [];
+  let initialBalance = null;
+  let finalBalance = null;
+
+  for (let p = 1; p <= doc.numPages; p++) {
+    const page = await doc.getPage(p);
+    const content = await page.getTextContent();
+    const items = content.items.map(it => ({
+      str: it.str.trim(),
+      x: it.transform[4],
+      y: it.transform[5]
+    })).filter(it => it.str);
+
+    const dateItems = items.filter(it => /^\d{2}\/\d{2}\/\d{4}$/.test(it.str));
+    if (!dateItems.length) continue;
+
+    const isRotated = dateItems.length > 1 && Math.abs(dateItems[0].y - dateItems[1].y) < 2;
+    const coordProp = isRotated ? "x" : "y";
+    const sortProp = isRotated ? "y" : "x";
+
+    const map = new Map();
+    for (const it of items) {
+      const key = Math.round(it[coordProp] / 4) * 4;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(it);
+    }
+
+    const sortedKeys = Array.from(map.keys()).sort((a, b) => isRotated ? a - b : b - a);
+    for (const k of sortedKeys) {
+      const rowItems = map.get(k);
+      rowItems.sort((a, b) => a[sortProp] - b[sortProp]);
+      const texts = rowItems.map(it => it.str);
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(texts[0])) {
+        rows.push(texts);
+      }
+    }
+  }
+
+  if (!rows.length) {
+    throw new Error("No se detectaron movimientos en el extracto PDF. Comprueba que sea un documento legible.");
+  }
+
+  const transactions = [];
+  for (const r of rows) {
+    const rawDate = r[0];
+    const date = parseBankDate(rawDate);
+    const noteRaw = r.length >= 4 ? r[3] : r[1];
+    const note = cleanBankConcept(noteRaw);
+
+    let amount = NaN;
+    let balAfter = NaN;
+    if (r.length >= 5) {
+      amount = parseBankAmount(r[r.length - 2]);
+      balAfter = parseBankAmount(r[r.length - 1]);
+      if (isNaN(amount) && r.length >= 6) {
+        amount = parseBankAmount(r[4]);
+      }
+    } else if (r.length >= 3) {
+      amount = parseBankAmount(r[2]);
+    }
+
+    if (!date || isNaN(amount) || amount === 0) continue;
+    const categoryId = guessCategory(note, amount, existingTxs);
+
+    transactions.push({ date, amount, note, categoryId });
+
+    if (finalBalance === null && !isNaN(balAfter)) {
+      finalBalance = balAfter;
+    }
+    if (!isNaN(balAfter)) {
+      initialBalance = Math.round((balAfter - amount) * 100) / 100;
+    }
+  }
+
+  transactions.sort((a, b) => a.date.localeCompare(b.date));
+
+  return {
+    transactions,
+    totalCount: transactions.length,
+    expensesCount: transactions.filter(t => t.amount < 0).length,
+    incomesCount: transactions.filter(t => t.amount > 0).length,
+    fromDate: transactions[0]?.date || iso(),
+    toDate: transactions[transactions.length - 1]?.date || iso(),
+    initialBalance,
+    finalBalance
+  };
+}
+
+/**
+ * Parsea un extracto bancario en cualquier formato: CSV, TXT, TSV o PDF
+ */
+export async function parseBankFile(file, existingTxs = []) {
+  if (file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf") {
+    const arrayBuffer = await file.arrayBuffer();
+    return parseBankPDF(arrayBuffer, existingTxs);
+  }
+  const text = await file.text();
+  return parseBankCSV(text, existingTxs);
+}
+
+/**
  * Aplica los movimientos importados al estado, filtrando duplicados existentes en la cuenta seleccionada
  * y vinculando automáticamente con los gastos fijos configurados.
  */

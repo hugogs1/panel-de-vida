@@ -18,7 +18,7 @@ import {
 } from "./finanzas-forms.js";
 
 // Estado de la pantalla (no se guarda): pestaña, mes visible y simulador
-const ui = { tab: "cartera", ym: iso().slice(0, 7), open: null, acc: null, simAmount: "", simResult: null };
+const ui = { tab: "cartera", ym: iso().slice(0, 7), open: null, acc: null, simAmount: "", simResult: null, movFilter: "all" };
 export function setFinanceMonth(ym) {
   if (ym && /^\d{4}-\d{2}$/.test(ym)) {
     ui.ym = ym;
@@ -249,24 +249,40 @@ function fijosTab(state, w) {
   const rec = [...state.finance.recurring].sort((a, b) => (a.active === false) - (b.active === false) || (a.nextDate || "").localeCompare(b.nextDate || ""));
   const fixedExpensesOnly = rec.filter(r => r.amount < 0);
   const fixedTotal = Math.abs(fixedExpensesOnly.filter(r => r.active !== false).reduce((s, r) => s + perMonth(r), 0));
+  const hasDemoRules = rec.some(r => r.id === "rec-alquiler" || r.id === "rec-netflix" || r.id === "rec-gym");
+  const monthTxs = state.finance.transactions.filter(t => t.date.startsWith(ui.ym) && !t.transferId && t.amount < 0);
 
   return `<section class="card">
     <h2 class="card-h"><span class="h-dot" style="--c:var(--fin)"></span>Tus Gastos Fijos y Suscripciones<span class="spacer"></span><button class="btn primary small" type="button" data-act="new-rec">${icon.plus} Nuevo fijo</button></h2>
-    <p class="hint">Son tus pagos fijos comprometidos (alquiler, gimnasio, internet, streaming). Tu cartera los tiene siempre en cuenta para calcular tu dinero libre real.</p>
+    <p class="hint">Son tus pagos fijos comprometidos (alquiler, gimnasio, facturas, streaming). Tu cartera los reserva automáticamente para que nunca te quedes corto.</p>
     
     <div class="split" style="margin:14px 0">
       <div><small>Total fijos comprometidos</small><b class="num neg">-${money(fixedTotal)} / mes</b></div>
-      <div><small>Fijos activos programados</small><b class="num">${fixedExpensesOnly.filter(r => r.active !== false).length} activos</b></div>
+      <div><small>Cargados este mes</small><b class="num">${money(w.actualFixedSpent)} (${w.pendingFixed > 0 ? `${money(w.pendingFixed)} pendientes` : "todos cobrados"})</b></div>
     </div>
 
     ${rec.length ? `
-      <div class="list">${rec.map(r => `
+      <div class="list">${rec.map(r => {
+        const rName = norm(r.name);
+        const paidTx = monthTxs.find(t => t.recurringId === r.id || (Math.abs(t.amount - r.amount) < 0.05 && ((rName && norm(t.note).includes(rName)) || (rName && norm(r.name).includes(norm(t.note))) || t.categoryId === r.categoryId)));
+        return `
         <button class="item tap${r.active === false ? " is-off" : ""}" type="button" data-act="edit-rec" data-id="${r.id}">
           <span class="cat-ico" style="--c:${catColor(state, r.categoryId)}"></span>
-          <span class="t">${esc(r.name)}<small>${FREQS[r.every] || "Mensual"} · ${r.active === false ? "En pausa" : `próximo ${shortDate(r.nextDate)}`}</small></span>
+          <span class="t">
+            <b>${esc(r.name)}</b>
+            <small>${FREQS[r.every] || "Mensual"} · ${r.active === false ? "En pausa" : (paidTx ? `<span style="color:var(--ok)">✅ Cobrado el ${paidTx.date.slice(8, 10)}/${paidTx.date.slice(5, 7)}</span>` : `próximo ${shortDate(r.nextDate)}`)}</small>
+          </span>
           <b class="num ${r.amount > 0 ? "pos" : ""}">${signed(r.amount)}</b>
-        </button>`).join("")}</div>`
-    : `<div class="empty">Añade aquí el alquiler, tus suscripciones, el wifi… Se reservarán de tu presupuesto para que nunca te quedes corto.</div>`}
+        </button>`;
+      }).join("")}</div>`
+    : `<div class="empty">No tienes gastos fijos configurados. Añade alquiler, gimnasio o suscripciones para reservarlos en tu presupuesto.</div>`}
+
+    ${hasDemoRules ? `
+      <div style="margin-top:16px;text-align:center">
+        <button class="btn small" type="button" data-act="purge-demo-rec" style="color:var(--danger);border-color:rgba(255,69,58,0.3);width:100%">
+          🗑️ Quitar gastos fijos de ejemplo (Alquiler, Netflix, Gym)
+        </button>
+      </div>` : ""}
   </section>`;
 }
 
@@ -274,15 +290,36 @@ function fijosTab(state, w) {
 function movsTab(state) {
   const fin = state.finance;
   const accName = id => fin.accounts.find(a => a.id === id)?.name || "Cuenta borrada";
-  const txs = fin.transactions
+  const movFilter = ui.movFilter || "all";
+
+  const allTxs = fin.transactions
     .filter(t => t.date.startsWith(ui.ym) && !(t.transferId && t.amount > 0))
     .sort((a, b) => b.date.localeCompare(a.date));
+
+  const countVar = allTxs.filter(t => t.amount < 0 && !t.transferId && !isFixedTx(t, state.finance.recurring)).length;
+  const countFixed = allTxs.filter(t => t.amount < 0 && isFixedTx(t, state.finance.recurring)).length;
+  const countInc = allTxs.filter(t => t.amount > 0 && !t.transferId).length;
+
+  const txs = allTxs.filter(t => {
+    if (movFilter === "variable") return t.amount < 0 && !t.transferId && !isFixedTx(t, state.finance.recurring);
+    if (movFilter === "fixed") return t.amount < 0 && isFixedTx(t, state.finance.recurring);
+    if (movFilter === "income") return t.amount > 0 && !t.transferId;
+    return true;
+  });
+
   const add = `
     <div class="btn-row" style="margin-bottom:12px">
       <button class="btn primary" type="button" data-act="new-tx">${icon.plus} Nuevo movimiento</button>
-      <button class="btn" type="button" data-act="import-bank">${icon.upload} Importar banco (CSV)</button>
+      <button class="btn" type="button" data-act="import-bank">${icon.upload} Importar banco (PDF / CSV)</button>
+    </div>
+    <div class="chips" role="tablist" style="margin-bottom:12px">
+      <button type="button" class="chip small" data-act="mov-filter" data-f="all" aria-selected="${movFilter === "all"}">Todos (${allTxs.length})</button>
+      <button type="button" class="chip small" data-act="mov-filter" data-f="variable" aria-selected="${movFilter === "variable"}">Variables (${countVar})</button>
+      <button type="button" class="chip small" data-act="mov-filter" data-f="fixed" aria-selected="${movFilter === "fixed"}">Fijos (${countFixed})</button>
+      <button type="button" class="chip small" data-act="mov-filter" data-f="income" aria-selected="${movFilter === "income"}">Ingresos (${countInc})</button>
     </div>`;
-  if (!txs.length) return `<section class="card">${add}<div class="empty">No hay movimientos en ${monthLabel(ui.ym).toLowerCase()}.</div></section>`;
+
+  if (!txs.length) return `<section class="card">${add}<div class="empty">No hay movimientos ${movFilter !== "all" ? `de tipo ${movFilter} ` : ""}en ${monthLabel(ui.ym).toLowerCase()}.</div></section>`;
 
   const days = new Map();
   txs.forEach(t => { if (!days.has(t.date)) days.set(t.date, []); days.get(t.date).push(t); });
@@ -301,7 +338,7 @@ function movsTab(state) {
         const isFixed = isFixedTx(t, state.finance.recurring);
         return `<button class="item tap" type="button" data-act="edit-tx" data-id="${t.id}">
           <span class="cat-ico" style="--c:${catColor(state, t.categoryId)}"></span>
-          <span class="t">${esc(t.note || catLabel(state, t.categoryId))}${isFixed ? ` <span class="tag" style="--c:var(--cyan);font-size:.68rem">Fijo</span>` : ""}<small>${esc(catLabel(state, t.categoryId))} · ${esc(accName(t.accountId))}</small></span>
+          <span class="t"><b>${esc(t.note || catLabel(state, t.categoryId))}</b>${isFixed ? ` <span class="tag" style="--c:var(--cyan);font-size:.68rem">Fijo</span>` : ` <span class="tag" style="--c:var(--muted);font-size:.68rem">Variable</span>`}<small>${esc(catLabel(state, t.categoryId))} · ${esc(accName(t.accountId))}</small></span>
           <b class="num ${t.amount > 0 ? "pos" : ""}">${signed(t.amount)}</b></button>`;
       }).join("")}</div>`;
     }).join("")}
@@ -411,6 +448,18 @@ export function mount(root, state, signal) {
         case "edit-goal": openGoalForm(id); break;
         case "contrib": openContribute(id); break;
         case "cats": openCategories(); break;
+        case "mov-filter": ui.movFilter = b.dataset.f; rerender(); break;
+        case "purge-demo-rec": {
+          update(st => {
+            const demoIds = new Set(["rec-alquiler", "rec-netflix", "rec-gym"]);
+            st.finance.recurring = st.finance.recurring.filter(r => !demoIds.has(r.id) && !(norm(r.name) === "alquiler" && Math.abs(r.amount) === 650));
+            st.finance.transactions = st.finance.transactions.filter(t => !t.auto || !demoIds.has(t.recurringId));
+            reconcileFinance(st);
+          });
+          toast("Fijos de ejemplo eliminados");
+          rerender();
+          break;
+        }
       }
     }
 

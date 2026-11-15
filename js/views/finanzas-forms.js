@@ -6,7 +6,7 @@ import { icon } from "../icons.js";
 import { iso } from "../stats.js";
 import { seg, field } from "../forms.js";
 import { ACCOUNT_TYPES, FREQS, parseAmount, amountInput, applyRecurring, accountBalance, catById, catLabel, checkExpenseViability, isFixedTx, reconcileFinance } from "../finance.js";
-import { parseBankCSV, applyBankImport } from "../bank.js";
+import { parseBankCSV, parseBankFile, applyBankImport } from "../bank.js";
 import { setFinanceMonth } from "./finanzas.js";
 
 // ---------- Piezas comunes
@@ -524,16 +524,16 @@ export function openBankImportModal(targetAccountId = null) {
       ${field("Cuenta de destino", "bank-acc", `<select class="input" id="bank-acc">${accs.map(a => `<option value="${a.id}"${a.id === initialAcc ? " selected" : ""}>${esc(a.name)}</option>`).join("")}</select>`)}
 
       <div class="chips" role="tablist" style="margin:6px 0 10px">
-        <button type="button" class="chip" id="btn-mode-file" aria-selected="true">Subir archivo CSV</button>
+        <button type="button" class="chip" id="btn-mode-file" aria-selected="true">Subir archivo (PDF o CSV)</button>
         <button type="button" class="chip" id="btn-mode-paste" aria-selected="false">Pegar texto copiado</button>
       </div>
 
       <div id="bank-step-upload">
         <label class="btn primary" for="bank-file-input" style="width:100%;margin-top:4px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;">
-          ${icon.upload} Seleccionar archivo CSV / Extracto
+          ${icon.upload} Seleccionar PDF o CSV bancario
         </label>
-        <input type="file" id="bank-file-input" class="sr-only" accept=".csv,.txt,.tsv,text/csv,text/plain">
-        <p class="hint" style="text-align:center;margin-top:8px">Compatible con ING, BBVA, Santander, CaixaBank, Sabadell y Revolut.</p>
+        <input type="file" id="bank-file-input" class="sr-only" accept=".pdf,.csv,.txt,.tsv,application/pdf,text/csv,text/plain">
+        <p class="hint" style="text-align:center;margin-top:8px">Compatible con extractos de ING (PDF y CSV), BBVA, Santander, CaixaBank, Sabadell y Revolut.</p>
       </div>
 
       <div id="bank-step-paste" hidden style="margin-top:4px">
@@ -575,14 +575,12 @@ export function openBankImportModal(targetAccountId = null) {
   const confirmBtn = sheet.querySelector("#bank-confirm-btn");
   const accSelect = sheet.querySelector("#bank-acc");
 
-  const showPreview = (text) => {
-    const currentTxs = getState().finance.transactions;
-    parsedResult = parseBankCSV(text, currentTxs);
-
+  const showPreview = (result) => {
+    parsedResult = result;
     countVal.textContent = `${parsedResult.totalCount} (${parsedResult.expensesCount} gastos, ${parsedResult.incomesCount} ingresos)`;
     datesVal.textContent = `${parsedResult.fromDate} a ${parsedResult.toDate}`;
 
-    previewList.innerHTML = parsedResult.transactions.slice(0, 5).map(t => `
+    previewList.innerHTML = parsedResult.transactions.slice(0, 6).map(t => `
       <div class="item" style="padding:8px 10px;font-size:13px">
         <span class="t"><b>${esc(t.note)}</b><small>${t.date} · ${catLabel(getState(), t.categoryId)}</small></span>
         <b class="num ${t.amount > 0 ? "pos" : "neg"}">${t.amount > 0 ? "+" : ""}${money(t.amount)}</b>
@@ -612,7 +610,9 @@ export function openBankImportModal(targetAccountId = null) {
     const val = pasteInput.value.trim();
     if (!val) { toast("Pega primero las filas del extracto", { error: true }); return; }
     try {
-      showPreview(val);
+      const currentTxs = getState().finance.transactions;
+      const res = parseBankCSV(val, currentTxs);
+      showPreview(res);
     } catch (err) {
       toast(err.message || "No se pudo interpretar el texto copiado", { error: true, ms: 4000 });
     }
@@ -622,11 +622,13 @@ export function openBankImportModal(targetAccountId = null) {
     const file = e.target.files[0];
     if (!file) return;
     try {
-      toast("Leyendo extracto...", { ms: 1500 });
-      const text = await file.text();
-      showPreview(text);
+      toast("Leyendo extracto...", { ms: 2500 });
+      const currentTxs = getState().finance.transactions;
+      const res = await parseBankFile(file, currentTxs);
+      showPreview(res);
+      toast(`Detectados ${res.totalCount} movimientos`);
     } catch (err) {
-      toast(err.message || "No se pudo interpretar el archivo bancario", { error: true, ms: 4000 });
+      toast(err.message || "No se pudo interpretar el archivo bancario", { error: true, ms: 4500 });
       e.target.value = "";
     }
   });
@@ -641,8 +643,12 @@ export function openBankImportModal(targetAccountId = null) {
         res = applyBankImport(st, accId, parsedResult.transactions, { replaceExisting });
         if (replaceExisting) {
           const targetAcc = st.finance.accounts.find(a => a.id === accId);
-          if (targetAcc && (targetAcc.initial === 0 || !targetAcc.initial)) {
-            targetAcc.initial = 310.07;
+          if (targetAcc) {
+            if (parsedResult.initialBalance != null) {
+              targetAcc.initial = parsedResult.initialBalance;
+            } else if (targetAcc.initial === 0 || !targetAcc.initial) {
+              targetAcc.initial = 310.07;
+            }
           }
         }
         reconcileFinance(st);
