@@ -4,6 +4,7 @@
 
 import { iso, parseISO, addDays } from "./stats.js";
 import { uid, money } from "./ui.js";
+import { guessCategory } from "./bank.js";
 
 // ---------- Categorías por defecto (con subcategorías)
 const PALETTE = {
@@ -31,6 +32,7 @@ const DEFAULTS = [
 ];
 
 const slug = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+export const norm = s => String(s || "").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 export function defaultCategories() {
   const out = [];
@@ -113,7 +115,112 @@ export function nextOccurrence(dateISO, every, day) {
 }
 const daysIn = (y, m) => new Date(y, m + 1, 0).getDate();
 
-/** Muta el estado: crea los movimientos de fijos vencidos. Devuelve cuántos ha creado. */
+/**
+ * Determina si una transacción es un gasto fijo recurrente
+ */
+export function isFixedTx(t, recurringList = []) {
+  if (!t || t.amount >= 0 || t.transferId) return false;
+  if (t.isFixed === true || t.auto === true || Boolean(t.recurringId)) return true;
+  if (t.isFixed === false) return false;
+
+  // Si no tiene flag explícito, comprobar si coincide con alguna regla de fijos activa
+  if (recurringList && recurringList.length) {
+    const tNote = norm(t.note);
+    return recurringList.some(r => {
+      if (r.active === false || r.amount >= 0) return false;
+      const rName = norm(r.name);
+      const amountMatches = Math.abs(r.amount - t.amount) < 0.05;
+      const noteMatches = tNote && rName && (tNote.includes(rName) || rName.includes(tNote));
+      return amountMatches && (noteMatches || r.categoryId === t.categoryId);
+    });
+  }
+  return false;
+}
+
+/**
+ * Concilia y desduplica fijos vs movimientos reales:
+ * 1. Vincula transacciones reales (bancarias o manuales) con sus reglas de fijos (isFixed = true, recurringId).
+ * 2. Si un fijo ya se ha cobrado con un movimiento real en un mes, elimina transacciones sintéticas duplicadas (auto: true).
+ * 3. Elimina posibles duplicados de auto: true para la misma regla en el mismo mes.
+ */
+export function reconcileFinance(state) {
+  const fin = state?.finance;
+  if (!fin || !Array.isArray(fin.transactions)) return 0;
+  const recurring = (fin.recurring || []).filter(r => r.active !== false && r.amount < 0);
+  if (!recurring.length && !fin.transactions.some(t => t.auto)) return 0;
+
+  let changes = 0;
+  const toRemoveIds = new Set();
+
+  // Agrupar transacciones reales por mes
+  const byMonth = new Map();
+  for (const t of fin.transactions) {
+    if (t.amount >= 0 || t.transferId) continue;
+    const ym = t.date.slice(0, 7);
+    if (!byMonth.has(ym)) byMonth.set(ym, []);
+    byMonth.get(ym).push(t);
+  }
+
+  for (const [ym, txs] of byMonth.entries()) {
+    for (const r of recurring) {
+      const rName = norm(r.name);
+      // Buscar si hay movimientos reales (no auto) que paguen este fijo
+      const realMatches = txs.filter(t => !t.auto && (
+        t.recurringId === r.id ||
+        (Math.abs(t.amount - r.amount) < 0.05 && (
+          (rName && norm(t.note).includes(rName)) ||
+          (rName && norm(r.name).includes(norm(t.note))) ||
+          t.categoryId === r.categoryId
+        ))
+      ));
+
+      if (realMatches.length > 0) {
+        // Marcar el primer movimiento real como el pago del fijo
+        const primary = realMatches[0];
+        if (!primary.isFixed || primary.recurringId !== r.id) {
+          primary.isFixed = true;
+          primary.recurringId = r.id;
+          changes++;
+        }
+
+        // Si existen movimientos auto: true para esta misma regla en este mes, eliminarlos para evitar duplicidad
+        const autos = txs.filter(t => t.auto && t.recurringId === r.id);
+        for (const a of autos) {
+          toRemoveIds.add(a.id);
+          changes++;
+        }
+      } else {
+        // No hay movimiento real: si hay múltiples autos para la misma regla en el mismo mes, conservar solo 1
+        const autos = txs.filter(t => t.auto && t.recurringId === r.id);
+        if (autos.length > 1) {
+          for (let i = 1; i < autos.length; i++) {
+            toRemoveIds.add(autos[i].id);
+            changes++;
+          }
+        }
+      }
+    }
+  }
+
+  if (toRemoveIds.size > 0) {
+    fin.transactions = fin.transactions.filter(t => !toRemoveIds.has(t.id));
+  }
+
+  // 3. Re-evaluar categorización de movimientos bancarios que hayan quedado como "c-otros" o "c-otrosing"
+  for (const t of fin.transactions) {
+    if (t.source === "banco" && (t.categoryId === "c-otros" || t.categoryId === "c-otrosing" || !t.categoryId)) {
+      const betterCat = guessCategory(t.note, t.amount, fin.transactions);
+      if (betterCat && betterCat !== "c-otros" && betterCat !== "c-otrosing") {
+        t.categoryId = betterCat;
+        changes++;
+      }
+    }
+  }
+
+  return changes;
+}
+
+/** Muta el estado: crea los movimientos de fijos vencidos sin duplicar los ya cargados. Devuelve cuántos ha creado. */
 export function applyRecurring(state, today = iso()) {
   let created = 0;
   for (const r of state.finance.recurring) {
@@ -121,8 +228,35 @@ export function applyRecurring(state, today = iso()) {
     let guard = 0;
     while (r.nextDate <= today && guard++ < 400) {
       if (state.finance.accounts.some(a => a.id === r.accountId)) {
-        state.finance.transactions.push({ id: uid(), date: r.nextDate, amount: r.amount, accountId: r.accountId, categoryId: r.categoryId, note: r.name, auto: true, recurringId: r.id });
-        created++;
+        const ym = r.nextDate.slice(0, 7);
+        const rName = norm(r.name);
+        // Comprobar si ya existe un movimiento (real o auto) para esta regla en este mes
+        const alreadyExists = state.finance.transactions.some(t =>
+          t.date.startsWith(ym) &&
+          !t.transferId &&
+          (
+            t.recurringId === r.id ||
+            (Math.abs(t.amount - r.amount) < 0.05 && (
+              (rName && norm(t.note).includes(rName)) ||
+              (rName && norm(r.name).includes(norm(t.note)))
+            ))
+          )
+        );
+
+        if (!alreadyExists) {
+          state.finance.transactions.push({
+            id: uid(),
+            date: r.nextDate,
+            amount: r.amount,
+            accountId: r.accountId,
+            categoryId: r.categoryId,
+            note: r.name,
+            auto: true,
+            isFixed: true,
+            recurringId: r.id
+          });
+          created++;
+        }
       }
       r.nextDate = nextOccurrence(r.nextDate, r.every, r.day);
     }
@@ -130,10 +264,12 @@ export function applyRecurring(state, today = iso()) {
   return created;
 }
 
-/** Asegura categorías por defecto y aplica fijos. Se llama al arrancar. */
+/** Asegura categorías por defecto, aplica fijos y concilia. Se llama al arrancar. */
 export function ensureFinance(state) {
   if (!state.finance.categories.length) state.finance.categories = defaultCategories();
-  return applyRecurring(state);
+  const created = applyRecurring(state);
+  reconcileFinance(state);
+  return created;
 }
 
 // ---------- Utilidades de formulario
@@ -158,14 +294,49 @@ export function getWalletBudget(state, ym = iso().slice(0, 7)) {
   const actualIncome = sum.income || 0;
   const totalIncome = configuredIncome > 0 ? configuredIncome : actualIncome;
 
-  // Gastos fijos comprometidos (mensuales)
-  const fixedList = (fin.recurring || []).filter(r => r.active !== false && r.amount < 0);
-  const fixedMonthlyTotal = Math.abs(fixedList.reduce((acc, r) => acc + perMonth(r), 0));
+  // Reglas de gastos fijos configuradas
+  const fixedRules = (fin.recurring || []).filter(r => r.active !== false && r.amount < 0);
 
-  // Gastos variables apuntados en el mes (excluyendo auto/recurring y transferencias)
-  const variableSpent = Math.abs(fin.transactions
-    .filter(t => t.date.startsWith(ym) && t.amount < 0 && !t.auto && !t.transferId)
-    .reduce((acc, t) => acc + t.amount, 0));
+  // Todos los gastos del mes (excluyendo transferencias)
+  const monthExpenses = (fin.transactions || []).filter(t => t.date.startsWith(ym) && t.amount < 0 && !t.transferId);
+
+  // Separar en fijos y variables sin solapamiento
+  const fixedTxs = [];
+  const variableTxs = [];
+
+  for (const t of monthExpenses) {
+    if (isFixedTx(t, fixedRules)) {
+      fixedTxs.push(t);
+    } else {
+      variableTxs.push(t);
+    }
+  }
+
+  // 1. Gasto fijo real ya cargado este mes
+  const actualFixedSpent = Math.abs(fixedTxs.reduce((acc, t) => acc + t.amount, 0));
+
+  // 2. Gastos fijos programados que aún están pendientes este mes
+  let pendingFixed = 0;
+  for (const r of fixedRules) {
+    // ¿Ya hay algún movimiento fijo cargado para este recurrente en este mes?
+    const isCovered = fixedTxs.some(t =>
+      t.recurringId === r.id ||
+      (Math.abs(t.amount - r.amount) < 0.05 && (
+        norm(t.note).includes(norm(r.name)) ||
+        norm(r.name).includes(norm(t.note)) ||
+        t.categoryId === r.categoryId
+      ))
+    );
+    if (!isCovered) {
+      pendingFixed += Math.abs(perMonth(r));
+    }
+  }
+
+  // Total de gastos fijos comprometidos (cargados + pendientes)
+  const fixedMonthlyTotal = actualFixedSpent + pendingFixed;
+
+  // Total de gastos variables reales de este mes
+  const variableSpent = Math.abs(variableTxs.reduce((acc, t) => acc + t.amount, 0));
 
   // Dinero disponible neto tras fijos
   const disposable = Math.max(0, totalIncome - fixedMonthlyTotal);
@@ -181,7 +352,7 @@ export function getWalletBudget(state, ym = iso().slice(0, 7)) {
   const daysLeft = isCurrentMonth ? Math.max(1, totalDays - currentDay + 1) : 1;
   const dailyBudget = remainingFree > 0 ? (remainingFree / daysLeft) : 0;
 
-  // Porcentaje de presupuesto consumido
+  // Porcentaje de presupuesto consumido (fijos + variables / ingresos)
   const totalEstimatedExpense = fixedMonthlyTotal + variableSpent;
   const burnPct = totalIncome > 0 ? Math.min(100, Math.round((totalEstimatedExpense / totalIncome) * 100)) : 0;
 
@@ -191,9 +362,13 @@ export function getWalletBudget(state, ym = iso().slice(0, 7)) {
     actualIncome,
     totalIncome,
     fixedMonthlyTotal,
-    fixedCount: fixedList.length,
-    fixedList,
+    actualFixedSpent,
+    pendingFixed,
+    fixedCount: fixedRules.length,
+    fixedList: fixedRules,
+    fixedTxsCount: fixedTxs.length,
     variableSpent,
+    variableCount: variableTxs.length,
     disposable,
     remainingFree,
     totalEstimatedExpense,

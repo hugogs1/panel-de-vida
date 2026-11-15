@@ -5,8 +5,9 @@ import { openSheet, closeSheet, toast, confirmSheet, esc, uid, money } from "../
 import { icon } from "../icons.js";
 import { iso } from "../stats.js";
 import { seg, field } from "../forms.js";
-import { ACCOUNT_TYPES, FREQS, parseAmount, amountInput, applyRecurring, accountBalance, catById, catLabel, checkExpenseViability } from "../finance.js";
+import { ACCOUNT_TYPES, FREQS, parseAmount, amountInput, applyRecurring, accountBalance, catById, catLabel, checkExpenseViability, isFixedTx, reconcileFinance } from "../finance.js";
 import { parseBankCSV, applyBankImport } from "../bank.js";
+import { setFinanceMonth } from "./finanzas.js";
 
 // ---------- Piezas comunes
 function categoryOptions(state, kind, selected) {
@@ -59,7 +60,13 @@ export function openTxForm({ id = null, type = "expense" } = {}) {
         ${field(`<span data-show="expense income">Cuenta</span><span data-show="transfer">Desde</span>`, "tx-acc", `<select class="input" id="tx-acc">${accountOptions(s, acc)}</select>`)}
       </div>
       <div data-show="transfer">${field("Hacia", "tx-acc2", `<select class="input" id="tx-acc2">${accountOptions(s, acc2)}</select>`)}</div>
-      <div data-show="expense">${field("Categoría", "tx-cat-e", `<select class="input" id="tx-cat-e">${categoryOptions(s, "expense", tx?.categoryId || "c-comida-supermercado")}</select>`)}</div>
+      <div data-show="expense">
+        ${field("Categoría", "tx-cat-e", `<select class="input" id="tx-cat-e">${categoryOptions(s, "expense", tx?.categoryId || "c-comida-supermercado")}</select>`)}
+        <label class="check-row" style="margin-top:6px;display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="tx-is-fixed"${tx && isFixedTx(tx, s.finance.recurring) ? " checked" : ""}>
+          <span>Gasto fijo mensual (alquiler, gimnasio, facturas, subs...)</span>
+        </label>
+      </div>
       <div data-show="income">${field("Categoría", "tx-cat-i", `<select class="input" id="tx-cat-i">${categoryOptions(s, "income", tx?.categoryId || "c-nomina")}</select>`)}</div>
       ${field("Nota (opcional)", "tx-note", `<input class="input" id="tx-note" maxlength="80" autocomplete="off" value="${esc(pair?.out.note ?? tx?.note ?? "")}" placeholder="p. ej. Mercadona">`)}
       ${tx?.auto ? `<p class="hint">Apuntado automáticamente por un gasto fijo.</p>` : ""}
@@ -128,7 +135,20 @@ export function openTxForm({ id = null, type = "expense" } = {}) {
           { id: pair?.in.id || uid(), date, amount: value, accountId: to, categoryId: null, note, transferId });
       } else {
         const categoryId = form.querySelector(t === "expense" ? "#tx-cat-e" : "#tx-cat-i").value;
-        st.finance.transactions.push({ ...(tx && !tx.transferId ? tx : {}), id: tx && !tx.transferId ? tx.id : uid(), date, amount: t === "expense" ? -value : value, accountId, categoryId, note, transferId: undefined });
+        const isFixed = t === "expense" ? form.querySelector("#tx-is-fixed")?.checked === true : false;
+        st.finance.transactions.push({
+          ...(tx && !tx.transferId ? tx : {}),
+          id: tx && !tx.transferId ? tx.id : uid(),
+          date,
+          amount: t === "expense" ? -value : value,
+          accountId,
+          categoryId,
+          note,
+          isFixed,
+          recurringId: isFixed ? (tx?.recurringId || null) : null,
+          transferId: undefined
+        });
+        reconcileFinance(st);
       }
     });
     closeSheet();
@@ -566,10 +586,18 @@ export function openBankImportModal(targetAccountId = null) {
       let res = null;
       update(st => {
         res = applyBankImport(st, accId, parsedResult.transactions);
+        reconcileFinance(st);
       });
       closeSheet();
+
+      // Navegar automáticamente al mes con los movimientos importados
+      const targetYm = parsedResult.toDate ? parsedResult.toDate.slice(0, 7) : (parsedResult.transactions[0]?.date ? parsedResult.transactions[0].date.slice(0, 7) : null);
+      if (targetYm) {
+        setFinanceMonth(targetYm);
+      }
+
       const msg = res.added
-        ? `Importados ${res.added} movimientos nuevos${res.skippedDuplicates ? ` (${res.skippedDuplicates} duplicados omitidos)` : ""}`
+        ? `Importados ${res.added} movimientos nuevos${res.linkedFixed ? ` (${res.linkedFixed} fijos detectados)` : ""}${res.skippedDuplicates ? ` · ${res.skippedDuplicates} duplicados omitidos` : ""}`
         : `Todo al día: los ${res.total} movimientos ya estaban en la cuenta`;
       toast(msg, { ms: 4500 });
     } catch (err) {

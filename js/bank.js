@@ -13,33 +13,72 @@ import { iso } from "./stats.js";
 import { uid } from "./ui.js";
 
 // Reglas de auto-categorización por palabras clave en el concepto del banco
-const RULES = [
+export const RULES = [
   // Supermercados y alimentación
-  { cat: "c-comida-supermercado", re: /mercadona|carrefour|lidl|alcampo|eroski|dia\b|aldi\b|hipercor|supercor|consum|bonpreu|ahorramas|coviran|costco|fruteria|carniceria|pescaderia|panaderia/i },
-  // Restaurantes, comida rápida y delivery
-  { cat: "c-comida-restaurantes", re: /restauran|burger|mcdonald|telepizza|domino|foster|ginos|vips|starbucks|tgb\b|kfc\b|pizzeria|taberna|cerveceria|tasca|meson|cafeteria|bar\b|just eat|justeat|ubereats|uber eats|glovo|deliveroo/i },
+  {
+    cat: "c-comida-supermercado",
+    re: /mercadona|carrefour|lidl|alcampo|eroski|dia\b|aldi\b|hipercor|supercor|consum|bonpreu|ahorramas|coviran|costco|condis|spar\b|bm supermercados|hiperdino|froiz|gadis|la sirena|supermercad|hipermercad|fruteria|carniceria|pescaderia|panaderia|charcuteria|verduleria|alimentacion/i
+  },
+  // Restaurantes, cafeterías, comida rápida y delivery
+  {
+    cat: "c-comida-restaurantes",
+    re: /restauran|burger king|burgerking|mcdonald|kfc\b|popeyes|taco bell|telepizza|domino'?s|dominospizza|foster'?s hollywood|fosters|ginos|vips\b|starbucks|tgb\b|the good burger|goiko|five guys|honest greens|tagliatella|100 montaditos|montaditos|pizzeria|taberna|cerveceria|tasca|meson|cafeteria|cafes\b|coffee|poke\b|sushi|churreria|bar\b|just eat|justeat|ubereats|uber eats|glovo|deliveroo/i
+  },
   // Combustible y gasolineras
-  { cat: "c-transporte-combustible", re: /repsol|cepsa|bp\b|galp|shell|petronor|estacion de servicio|gasolinera|carburante|ballenoil|plenoil/i },
-  // Transporte público, viajes y VTC
-  { cat: "c-transporte-publico", re: /renfe|metro\b|emt\b|alsa|tmb\b|cercanias|ave\b|iryo|ouigo|billete|billetes|autopista|peaje|uber\b|cabify|freenow|free now|taxi|bold\b|vueling|ryanair|iberia/i },
-  // Suscripciones y streaming
-  { cat: "c-subs", re: /netflix|spotify|hbo|prime video|amazon prime|disney|dazn|filmin|crunchyroll|youtube|patreon|apple\.com\/bill|google \*|openai|chatgpt/i },
+  {
+    cat: "c-transporte-combustible",
+    re: /repsol|cepsa|bp\b|galp|shell|petronor|estacion de servicio|gasolinera|carburante|ballenoil|plenoil|petroprix|autonetoil|campsa|esso\b/i
+  },
+  // Transporte público, viajes, peajes, parking y VTC
+  {
+    cat: "c-transporte-publico",
+    re: /renfe|metro\b|emt\b|alsa|tmb\b|cercanias|ave\b|iryo|ouigo|billete|billetes|autopista|peaje|bip&drive|bip & drive|bip and drive|ap-?\d+|parking|aparcamiento|telpark|easypark|parclick|smou\b|bicing|bicimad|uber\b|cabify|freenow|free now|taxi|bolt\b|vueling|ryanair|iberia|air europa|europcar|sixt|avis\b/i
+  },
+  // Suscripciones, streaming y software
+  {
+    cat: "c-subs",
+    re: /netflix|spotify|hbo\b|max\b|prime video|amazon prime|disney|dazn|filmin|crunchyroll|youtube|patreon|apple\.com\/bill|itunes|google \*|google play|google storage|openai|chatgpt|anthropic|claude|playstation|psn\b|xbox|nintendo|steam\b|audible|dropbox|icloud/i
+  },
   // Gimnasio, boxeo y deporte
-  { cat: "c-deporte-gimnasio", re: /gym|gimnasio|basic fit|basicfit|fitup|vivagym|altafit|mcfit|smartfit|crossfit|fitness/i },
-  { cat: "c-deporte-material", re: /decathlon|sprinter|jd sports|foot locker|nike|adidas|padel|boxeo/i },
+  {
+    cat: "c-deporte-gimnasio",
+    re: /gym|gimnasio|basic[ -]?fit|vivagym|viva gym|altafit|mcfit|smartfit|smart fit|fitness park|fitnesspark|synergym|dreamfit|crossfit|brooklyn fitboxing|fitboxing|boxeo|boxing/i
+  },
+  {
+    cat: "c-deporte-material",
+    re: /decathlon|sprinter|jd sports|foot locker|nike|adidas|padel|tenis|escalada/i
+  },
   // Salud y farmacia
-  { cat: "c-salud-farmacia", re: /farmacia|parafarmacia|botica/i },
-  { cat: "c-salud", re: /clinica|dental|dentista|sanitas|adeslas|asisa|quiron|hospital|optica|fisioterap/i },
-  // Casa y suministros
-  { cat: "c-casa", re: /alquiler|comunidad de prop|endesa|iberdrola|naturgy|totalenergies|aqualia|canal de isabel|vodafone|movistar|orange|digi\b|masmovil|o2\b|yoigo|pepephone/i },
-  // Compras y tecnología
-  { cat: "c-compras", re: /amazon|zara\b|bershka|pull and bear|pull&bear|mango\b|stradivarius|el corte ingles|corte ingles|ikea|leroy merlin|mediamarkt|media markt|pccomponentes|pc componentes|aliexpress|temu\b|shein/i },
-  // Ingresos: Nómina y transferencias a favor
-  { cat: "c-nomina", re: /nomina|sueldo|salario|pension|haberes/i },
-  { cat: "c-otrosing", re: /transferencia a su favor|ingreso en cuenta|abono transfer/i }
+  {
+    cat: "c-salud-farmacia",
+    re: /farmacia|parafarmacia|botica/i
+  },
+  {
+    cat: "c-salud",
+    re: /clinica|dental|dentista|sanitas|adeslas|asisa|dkv\b|mapfre|quiron|hospital|optica|fisioterap|fisio\b/i
+  },
+  // Casa, suministros y telecomunicaciones
+  {
+    cat: "c-casa",
+    re: /alquiler|hipoteca|\bcomunidad\b|comunidad de prop|comunidad propietarios|endesa|iberdrola|naturgy|totalenergies|repsol luz|aqualia|canal de isabel|aguas de|vodafone|movistar|orange|digi\b|masmovil|mas movil|o2\b|yoigo|pepephone|lowi|simyo|finetwork|jazztel/i
+  },
+  // Compras, moda y tecnología
+  {
+    cat: "c-compras",
+    re: /amazon|zara\b|bershka|pull and bear|pull&bear|mango\b|stradivarius|massimo dutti|oysho|el corte ingles|corte ingles|primark|shein|temu\b|aliexpress|ikea|leroy merlin|mediamarkt|media markt|pccomponentes|pc componentes|fnac|apple store/i
+  },
+  // Ingresos: Nómina, pensiones, transferencias a favor y Bizum recibido
+  {
+    cat: "c-nomina",
+    re: /nomina|sueldo|salario|pension|haberes/i
+  },
+  {
+    cat: "c-otrosing",
+    re: /transferencia a su favor|ingreso en cuenta|abono transfer|abono de|bizum de\b|bizum recibido|transferencia recibida/i
+  }
 ];
 
-const norm = s => String(s || "").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+export const norm = s => String(s || "").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 /**
  * Autodetecta el delimitador de un archivo de texto/CSV (;, , o \t)
@@ -123,7 +162,7 @@ function parseBankAmount(raw) {
  * Limpia y embellece el concepto de un extracto bancario
  */
 function cleanBankConcept(str) {
-  let s = String(str || "").trim().replace(/^['"]|['"]$/g, "");
+  let s = String(str || "").replace(/^\uFEFF/, "").replace(/\u00A0/g, " ").trim().replace(/^['"]|['"]$/g, "");
 
   // 1. Anonimización y seguridad: Eliminar cualquier IBAN (ej. ES21 1465... o ES211465...)
   s = s.replace(/\b[A-Z]{2}\d{2}[\s\d]{10,30}\b/gi, "");
@@ -136,8 +175,8 @@ function cleanBankConcept(str) {
   // 4. Eliminar etiquetas bancarias como "CTA: ...", "IBAN: ...", "TITULAR: ..."
   s = s.replace(/\b(iban|cta|cuenta|nif|cif|titular|ordenante|beneficiario)\s*[:=]?\s*[\w\d.-]+/gi, "");
 
-  // Quitar prefijos bancarios ruidosos habituales
-  s = s.replace(/^(compra en|pago con tarjeta en|pago en|transferencia de|transferencia a|recibo de|adeudo de|abono de|bizum a favor de|bizum de|pago bizum)\s+/i, "");
+  // 5. Quitar prefijos bancarios ruidosos habituales
+  s = s.replace(/^(recibo sepa de|recibo sepa|recibo de|adeudo por domiciliacion de|adeudo domiciliado|adeudo de|compra en|pago con tarjeta en|pago en comercio|pago en|pago tarjeta|transferencia de|transferencia a favor de|transferencia a|transferencia emitida a|transferencia emitida|transferencia recibida de|transferencia recibida|abono transfer|abono de|bizum a favor de|bizum de|pago bizum a|pago bizum)\s+/i, "");
   // Normalizar espacios múltiples
   s = s.replace(/\s{2,}/g, " ").trim();
   return s || "Movimiento bancario";
@@ -146,13 +185,19 @@ function cleanBankConcept(str) {
 /**
  * Sugiere una categoría según el concepto y el histórico existente
  */
-function guessCategory(note, amount, existingTxs = []) {
+export function guessCategory(note, amount, existingTxs = []) {
   const isIncome = amount > 0;
   const n = norm(note);
 
-  // 1. Buscar coincidencia exacta en el histórico del usuario
+  // 1. Buscar coincidencia exacta en el histórico del usuario (ignorando categorías genéricas previas)
   if (existingTxs.length) {
-    const prev = [...existingTxs].reverse().find(t => !t.transferId && norm(t.note) === n && (isIncome ? t.amount > 0 : t.amount < 0));
+    const prev = [...existingTxs].reverse().find(t =>
+      !t.transferId &&
+      norm(t.note) === n &&
+      t.categoryId !== "c-otros" &&
+      t.categoryId !== "c-otrosing" &&
+      (isIncome ? t.amount > 0 : t.amount < 0)
+    );
     if (prev?.categoryId) return prev.categoryId;
   }
 
@@ -163,7 +208,12 @@ function guessCategory(note, amount, existingTxs = []) {
     }
   }
 
-  // 3. Fallback genérico
+  // 3. Bizum como ocio / amigos si no hay otra regla
+  if (/bizum/i.test(note)) {
+    return isIncome ? "c-otrosing" : "c-ocio";
+  }
+
+  // 4. Fallback genérico
   return isIncome ? "c-otrosing" : "c-otros";
 }
 
@@ -323,6 +373,7 @@ export function parseBankCSV(text, existingTxs = []) {
 
 /**
  * Aplica los movimientos importados al estado, filtrando duplicados existentes en la cuenta seleccionada
+ * y vinculando automáticamente con los gastos fijos configurados.
  */
 export function applyBankImport(state, accountId, parsedTransactions) {
   if (!state.finance.accounts.some(a => a.id === accountId)) {
@@ -330,11 +381,13 @@ export function applyBankImport(state, accountId, parsedTransactions) {
   }
 
   const existing = state.finance.transactions.filter(t => t.accountId === accountId);
+  const recurring = (state.finance.recurring || []).filter(r => r.active !== false && r.amount < 0);
   const toAdd = [];
   let skippedDuplicates = 0;
+  let linkedFixed = 0;
 
   for (const item of parsedTransactions) {
-    // Comprobar si ya existe un movimiento idéntico en la misma cuenta
+    // 1. Comprobar si ya existe un movimiento idéntico en la misma cuenta
     const isDup = existing.some(ex =>
       ex.date === item.date &&
       Math.abs(ex.amount - item.amount) < 0.005 &&
@@ -346,6 +399,26 @@ export function applyBankImport(state, accountId, parsedTransactions) {
       continue;
     }
 
+    // 2. Comprobar si coincide con un gasto fijo recurrente
+    let isFixed = false;
+    let recurringId = null;
+
+    if (item.amount < 0 && recurring.length) {
+      const itemNote = norm(item.note);
+      const matchRec = recurring.find(r => {
+        const rName = norm(r.name);
+        const amountMatches = Math.abs(r.amount - item.amount) < 0.05;
+        const noteMatches = itemNote && rName && (itemNote.includes(rName) || rName.includes(itemNote));
+        return amountMatches && (noteMatches || r.categoryId === item.categoryId);
+      });
+
+      if (matchRec) {
+        isFixed = true;
+        recurringId = matchRec.id;
+        linkedFixed++;
+      }
+    }
+
     const newTx = {
       id: uid(),
       date: item.date,
@@ -353,6 +426,8 @@ export function applyBankImport(state, accountId, parsedTransactions) {
       accountId,
       categoryId: item.categoryId,
       note: item.note,
+      isFixed,
+      recurringId,
       source: "banco"
     };
 
@@ -368,6 +443,7 @@ export function applyBankImport(state, accountId, parsedTransactions) {
   return {
     added: toAdd.length,
     skippedDuplicates,
+    linkedFixed,
     total: parsedTransactions.length
   };
 }

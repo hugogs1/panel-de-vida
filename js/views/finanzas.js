@@ -9,7 +9,7 @@ import { registerQuickAction } from "../quickadd.js";
 import {
   ACCOUNT_TYPES, FREQS, accountBalance, totalBalance, monthSummary,
   balanceHistory, catLabel, catColor, getWalletBudget, checkExpenseViability,
-  perMonth, parseAmount
+  perMonth, parseAmount, isFixedTx, reconcileFinance
 } from "../finance.js";
 import {
   openTxForm, openAccountForm, openRecurringForm, openGoalForm,
@@ -18,6 +18,12 @@ import {
 
 // Estado de la pantalla (no se guarda): pestaña, mes visible y simulador
 const ui = { tab: "cartera", ym: iso().slice(0, 7), open: null, acc: null, simAmount: "", simResult: null };
+export function setFinanceMonth(ym) {
+  if (ym && /^\d{4}-\d{2}$/.test(ym)) {
+    ui.ym = ym;
+    window.dispatchEvent(new Event("pv:render"));
+  }
+}
 const TABS = {
   cartera: "Cartera y Balance",
   fijos: "Gastos Fijos",
@@ -146,7 +152,7 @@ function carteraTab(state, w, sum) {
             <button class="btn-link" type="button" data-act="tab" data-tab="fijos">Ver ${w.fixedCount}</button>
           </div>
           <b class="num neg">-${money(w.fixedMonthlyTotal)}</b>
-          <span class="mb-sub">Alquiler, facturas y subs</span>
+          <span class="mb-sub">${w.pendingFixed > 0 ? `${money(w.actualFixedSpent)} cargados · ${money(w.pendingFixed)} pendientes` : "Todos cargados"}</span>
         </div>
 
         <div class="metric-box">
@@ -155,7 +161,7 @@ function carteraTab(state, w, sum) {
             <button class="btn-link" type="button" data-act="tab" data-tab="movs">Ver movs</button>
           </div>
           <b class="num neg">-${money(w.variableSpent)}</b>
-          <span class="mb-sub">Compras de este mes</span>
+          <span class="mb-sub">${w.variableCount} compras este mes</span>
         </div>
 
         <div class="metric-box highlight">
@@ -274,9 +280,10 @@ function movsTab(state) {
             <span class="t">${esc(t.note || "Transferencia")}<small>${esc(accName(t.accountId))} → ${esc(accName(to?.accountId))}</small></span>
             <b class="num">${money(-t.amount)}</b></button>`;
         }
+        const isFixed = isFixedTx(t, state.finance.recurring);
         return `<button class="item tap" type="button" data-act="edit-tx" data-id="${t.id}">
           <span class="cat-ico" style="--c:${catColor(state, t.categoryId)}"></span>
-          <span class="t">${esc(t.note || catLabel(state, t.categoryId))}${t.auto ? ` <span class="tag" style="--c:var(--cyan)">Fijo</span>` : ""}<small>${esc(catLabel(state, t.categoryId))} · ${esc(accName(t.accountId))}</small></span>
+          <span class="t">${esc(t.note || catLabel(state, t.categoryId))}${isFixed ? ` <span class="tag" style="--c:var(--cyan);font-size:.68rem">Fijo</span>` : ""}<small>${esc(catLabel(state, t.categoryId))} · ${esc(accName(t.accountId))}</small></span>
           <b class="num ${t.amount > 0 ? "pos" : ""}">${signed(t.amount)}</b></button>`;
       }).join("")}</div>`;
     }).join("")}
