@@ -166,36 +166,83 @@ export function openTxForm({ id = null, type = "expense" } = {}) {
 export function openAccountForm(id = null) {
   const s = getState();
   const a = id ? s.finance.accounts.find(x => x.id === id) : null;
+  const currentBal = a ? accountBalance(s, a.id) : 0;
   const hasTx = a && s.finance.transactions.some(t => t.accountId === a.id);
+  const txSum = a ? s.finance.transactions.filter(t => t.accountId === a.id).reduce((sum, t) => sum + t.amount, 0) : 0;
+
   const sheet = openSheet(`
     <h2>${a ? "Editar cuenta" : "Nueva cuenta"}</h2>
     <form class="form" id="acc-form" novalidate>
-      ${field("Nombre", "acc-name", `<input class="input" id="acc-name" maxlength="30" autocomplete="off" value="${esc(a?.name || "")}" placeholder="p. ej. Cuenta nómina">`)}
+      ${field("Nombre", "acc-name", `<input class="input" id="acc-name" maxlength="30" autocomplete="off" value="${esc(a?.name || "")}" placeholder="p. ej. Cuenta ING">`)}
       ${field("Tipo", "acc-type", `<select class="input" id="acc-type">${Object.entries(ACCOUNT_TYPES).map(([v, l]) => `<option value="${v}"${v === (a?.type || "banco") ? " selected" : ""}>${l}</option>`).join("")}</select>`)}
-      ${field("Saldo inicial", "acc-initial", `<input class="input" id="acc-initial" inputmode="decimal" autocomplete="off" placeholder="0,00" value="${a ? String(a.initial).replace(".", ",") : ""}">`)}
-      <p class="hint">El dinero que tenía la cuenta antes de empezar a apuntar movimientos. Puede ser negativo (p. ej. una tarjeta de crédito).</p>
-      ${a ? `<p class="hint">Saldo actual: <b class="num">${money(accountBalance(s, a.id))}</b></p>` : ""}
-      <div class="btn-row">
-        ${a ? `<button class="btn danger" type="button" id="acc-del">Borrar</button>` : `<button class="btn" type="button" data-close>Cancelar</button>`}
+      ${field("Saldo actual en banco (€)", "acc-current", `<input class="input" id="acc-current" inputmode="decimal" autocomplete="off" placeholder="590,21" value="${a ? String(currentBal).replace(".", ",") : ""}">`)}
+      <p class="hint">Escribe el dinero real que tienes hoy en tu banco. El saldo se ajustará al instante para cuadrar exactamente.</p>
+      
+      <details style="margin:10px 0 6px;font-size:12px">
+        <summary style="cursor:pointer;color:var(--muted)">Opciones avanzadas (saldo inicial manual)</summary>
+        <div style="margin-top:8px">
+          ${field("Saldo inicial histórico", "acc-initial", `<input class="input" id="acc-initial" inputmode="decimal" autocomplete="off" placeholder="0,00" value="${a ? String(a.initial || 0).replace(".", ",") : "0"}">`)}
+          <p class="hint">Dinero antes del primer movimiento registrado.</p>
+        </div>
+      </details>
+
+      ${hasTx ? `
+        <div style="margin:12px 0 4px">
+          <button class="btn small" type="button" id="acc-reset-txs" style="width:100%;font-size:12px;color:var(--danger);border-color:rgba(255,69,58,0.3)">
+            🗑️ Limpiar movimientos de prueba de esta cuenta
+          </button>
+        </div>` : ""}
+
+      <div class="btn-row" style="margin-top:16px">
+        ${a ? `<button class="btn danger" type="button" id="acc-del">Borrar cuenta</button>` : `<button class="btn" type="button" data-close>Cancelar</button>`}
         <button class="btn primary" type="submit">Guardar</button>
       </div>
     </form>`);
+
   const form = sheet.querySelector("#acc-form");
   form.addEventListener("submit", e => {
     e.preventDefault();
     const name = form.querySelector("#acc-name").value.trim();
     if (!name) { toast("Escribe un nombre", { error: true }); return; }
-    const raw = form.querySelector("#acc-initial").value.trim();
-    const initial = raw ? parseAmount(raw.replace(/^[−-]/, "-")) : 0;
-    if (Number.isNaN(initial)) { toast("El saldo inicial no es un número válido", { error: true }); return; }
+    const rawCur = form.querySelector("#acc-current").value.trim();
+    const rawInit = form.querySelector("#acc-initial")?.value.trim();
+    let initial = 0;
+    if (rawCur) {
+      const curVal = parseAmount(rawCur);
+      if (isNaN(curVal)) { toast("El saldo actual no es un número válido", { error: true }); return; }
+      initial = Math.round((curVal - txSum) * 100) / 100;
+    } else if (rawInit) {
+      initial = parseAmount(rawInit.replace(/^[−-]/, "-")) || 0;
+    }
     const type = form.querySelector("#acc-type").value;
     update(st => {
       if (a) Object.assign(st.finance.accounts.find(x => x.id === a.id), { name, type, initial });
       else st.finance.accounts.push({ id: uid(), name, type, initial });
+      reconcileFinance(st);
     });
     closeSheet();
     toast(a ? "Cuenta actualizada" : "Cuenta creada");
   });
+
+  sheet.querySelector("#acc-reset-txs")?.addEventListener("click", async () => {
+    const ok = await confirmSheet({
+      title: `¿Limpiar movimientos de «${a.name}»?`,
+      text: "Se eliminarán los movimientos antiguos o de prueba registrados en esta cuenta. El saldo se mantendrá ajustado a tu saldo real.",
+      ok: "Limpiar movimientos",
+      danger: true
+    });
+    if (!ok) return;
+    const curVal = parseAmount(form.querySelector("#acc-current")?.value) || 0;
+    update(st => {
+      st.finance.transactions = st.finance.transactions.filter(t => t.accountId !== a.id);
+      const acc = st.finance.accounts.find(x => x.id === a.id);
+      if (acc) acc.initial = curVal;
+      reconcileFinance(st);
+    });
+    closeSheet();
+    toast("Movimientos de prueba eliminados");
+  });
+
   sheet.querySelector("#acc-del")?.addEventListener("click", async () => {
     if (hasTx) { toast("Esta cuenta tiene movimientos. Bórralos o muévelos a otra cuenta antes.", { error: true, ms: 4000 }); return; }
     if (!await confirmSheet({ title: `¿Borrar «${a.name}»?`, text: "La cuenta no tiene movimientos.", ok: "Borrar", danger: true })) return;
@@ -615,5 +662,79 @@ export function openBankImportModal(targetAccountId = null) {
     } catch (err) {
       toast(err.message || "Error al aplicar importación", { error: true });
     }
+  });
+}
+
+// ---------- 6. Ajuste directo de Saldo Real en Banco
+export function openAdjustBalanceModal(accId = null) {
+  const s = getState();
+  const accounts = s.finance.accounts;
+  if (!accounts.length) {
+    toast("Crea una cuenta primero", { error: true });
+    return;
+  }
+  const targetAcc = accounts.find(a => a.id === accId) || accounts[0];
+  const curBal = accountBalance(s, targetAcc.id);
+
+  const sheet = openSheet(`
+    <h2>⚡ Ajustar saldo real en banco</h2>
+    <p class="hint">Indica cuánto dinero tienes <b>hoy en tu cuenta bancaria</b>. La app corregirá tu cuenta para que cuadre exactamente y no vuelva a salirte en negativo.</p>
+    <form class="form" id="adjust-bal-form" novalidate>
+      ${accounts.length > 1 ? `
+        <div class="field">
+          <label class="label" for="adjust-acc-select">Cuenta a ajustar</label>
+          <select class="input" id="adjust-acc-select">
+            ${accounts.map(a => `<option value="${a.id}"${a.id === targetAcc.id ? " selected" : ""}>${esc(a.name)} (según app: ${money(accountBalance(s, a.id))})</option>`).join("")}
+          </select>
+        </div>` : `<input type="hidden" id="adjust-acc-select" value="${targetAcc.id}">`}
+
+      <div class="field">
+        <label class="label" for="adjust-bal-input">Dinero real que tienes hoy en el banco (€)</label>
+        <input class="input" id="adjust-bal-input" type="text" inputmode="decimal" autocomplete="off" placeholder="590,21" value="${curBal > 0 ? String(curBal).replace(".", ",") : "590,21"}" style="font-size:18px;font-weight:700">
+      </div>
+
+      <label class="check-row" style="margin-top:12px;display:flex;align-items:flex-start;gap:8px;font-size:12px;cursor:pointer">
+        <input type="checkbox" id="adjust-clean-old" checked>
+        <span><b>Limpiar gastos de prueba y movimientos automáticos huérfanos:</b> elimina gastos automáticos o falsos que estaban arrastrando tu saldo a negativo.</span>
+      </label>
+
+      <div class="btn-row" style="margin-top:18px">
+        <button class="btn" type="button" data-close>Cancelar</button>
+        <button class="btn primary" type="submit">Guardar saldo real</button>
+      </div>
+    </form>
+  `);
+
+  const form = sheet.querySelector("#adjust-bal-form");
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    const selAccId = sheet.querySelector("#adjust-acc-select")?.value;
+    const rawVal = sheet.querySelector("#adjust-bal-input")?.value?.trim();
+    const cleanOld = sheet.querySelector("#adjust-clean-old")?.checked === true;
+    const targetBalance = parseAmount(rawVal);
+
+    if (isNaN(targetBalance)) {
+      toast("Introduce un saldo válido (ej. 590,21)", { error: true });
+      return;
+    }
+
+    update(st => {
+      const acc = st.finance.accounts.find(a => a.id === selAccId);
+      if (!acc) return;
+
+      if (cleanOld) {
+        st.finance.transactions = st.finance.transactions.filter(t => t.accountId !== acc.id || !t.auto);
+      }
+
+      const txSum = st.finance.transactions
+        .filter(t => t.accountId === acc.id)
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      acc.initial = Math.round((targetBalance - txSum) * 100) / 100;
+      reconcileFinance(st);
+    });
+
+    closeSheet();
+    toast(`Saldo fijado en ${money(targetBalance)}`);
   });
 }

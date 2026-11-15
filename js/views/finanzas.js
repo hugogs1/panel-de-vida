@@ -13,7 +13,8 @@ import {
 } from "../finance.js";
 import {
   openTxForm, openAccountForm, openRecurringForm, openGoalForm,
-  openContribute, openCategories, openMonthlyIncomeForm, openBankImportModal
+  openContribute, openCategories, openMonthlyIncomeForm, openBankImportModal,
+  openAdjustBalanceModal
 } from "./finanzas-forms.js";
 
 // Estado de la pantalla (no se guarda): pestaña, mes visible y simulador
@@ -74,7 +75,10 @@ export function render(state) {
         <button class="icon-btn" type="button" data-act="month" data-n="1" aria-label="Mes siguiente"${isCurrent ? " disabled" : ""}>${icon.chevron}</button>
       </div>
 
-      <h2 class="card-h"><span class="h-dot" style="--c:var(--fin)"></span>${acc ? esc(acc.name) : "Saldo total en cuentas"}<span class="spacer"></span></h2>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+        <h2 class="card-h" style="margin:0"><span class="h-dot" style="--c:var(--fin)"></span>${acc ? esc(acc.name) : "Saldo total en cuentas"}</h2>
+        <button class="btn small" type="button" data-act="adjust-balance" data-id="${acc?.id || ""}" style="font-size:12px;padding:4px 10px;border-color:rgba(0,240,255,0.4);color:var(--cyan)">⚡ Ajustar saldo real</button>
+      </div>
       ${fin.accounts.length > 1 ? `<div class="chips acc-chips" role="tablist" aria-label="Ver saldo de">
         <button type="button" role="tab" class="chip small" data-act="acc" data-id="" aria-selected="${!acc}">Total</button>
         ${fin.accounts.map(a => `<button type="button" role="tab" class="chip small" data-act="acc" data-id="${a.id}" aria-selected="${acc?.id === a.id}">${esc(a.name)}</button>`).join("")}
@@ -103,25 +107,39 @@ export function render(state) {
 
 // ---------- 1. Cartera Inteligente y Balance
 function carteraTab(state, w, sum) {
-  const isHealthy = w.remainingFree >= (w.totalIncome * 0.2);
-  const isTight = w.remainingFree >= 0 && !isHealthy;
-  const isDeficit = w.remainingFree < 0;
+  const currentTotal = totalBalance(state);
+  const isHealthy = w.totalIncome > 0 && w.remainingFree >= (w.totalIncome * 0.2);
+  const isTight = w.totalIncome > 0 && w.remainingFree >= 0 && !isHealthy;
+  const isDeficit = w.configuredIncome > 0 && w.remainingFree < 0;
 
-  const statusBadge = w.totalIncome === 0
-    ? `<span class="tag" style="--c:var(--muted)">Sin ingreso mensual</span>`
-    : isDeficit
-      ? `<span class="tag" style="--c:var(--danger)">🔴 Déficit de ${money(Math.abs(w.remainingFree))}</span>`
-      : isTight
-        ? `<span class="tag" style="--c:var(--warn)">🟡 Margen ajustado</span>`
-        : `<span class="tag" style="--c:var(--ok)">🟢 Presupuesto saludable</span>`;
+  // Si no hay sueldo configurado, no asustar con "Déficit / En descubierto":
+  const netMonth = w.actualIncome - w.actualFixedSpent - w.variableSpent;
+  const displayAmount = w.configuredIncome > 0 ? w.remainingFree : (currentTotal > 0 ? currentTotal : netMonth);
+  const displayLabel = w.configuredIncome > 0
+    ? "Dinero libre disponible (del sueldo mensual)"
+    : (currentTotal > 0 ? "Saldo real en cuentas bancarias" : "Balance neto de este mes");
+
+  const statusBadge = w.configuredIncome === 0 && w.actualIncome === 0
+    ? `<span class="tag" style="--c:var(--muted)">Sin ingresos este mes</span>`
+    : w.configuredIncome === 0
+      ? `<span class="tag" style="--c:${netMonth >= 0 ? "var(--ok)" : "var(--warn)"}">Neto mes: ${signed(netMonth)}</span>`
+      : isDeficit
+        ? `<span class="tag" style="--c:var(--danger)">🔴 Déficit de ${money(Math.abs(w.remainingFree))}</span>`
+        : isTight
+          ? `<span class="tag" style="--c:var(--warn)">🟡 Margen ajustado</span>`
+          : `<span class="tag" style="--c:var(--ok)">🟢 Presupuesto saludable</span>`;
+
+  const dailySub = w.configuredIncome > 0
+    ? (w.remainingFree >= 0 ? `~${money(w.dailyBudget)} por día` : "Supera el sueldo previsto")
+    : (currentTotal > 0 ? `~${money(currentTotal / w.daysLeft)}/día de saldo` : (netMonth >= 0 ? "Presupuesto positivo" : "Gastos superan ingresos del mes"));
 
   return `
     <section class="card wallet-card">
       <div class="wallet-head">
         <div>
           <span class="sub-label">Cartera · ${monthLabel(ui.ym)}</span>
-          <div class="money-big num ${w.remainingFree >= 0 ? "pos" : "neg"}">${signed(w.remainingFree)}</div>
-          <div class="money-sub">Dinero libre disponible (después de fijos y gastos)</div>
+          <div class="money-big num ${displayAmount >= 0 ? "pos" : "neg"}">${displayAmount >= 0 ? "+" : ""}${money(displayAmount)}</div>
+          <div class="money-sub">${displayLabel}</div>
         </div>
         <div class="wallet-badge">${statusBadge}</div>
       </div>
@@ -132,7 +150,7 @@ function carteraTab(state, w, sum) {
         </div>
         <div class="wallet-progress-labels">
           <span><b>${w.burnPct}%</b> del presupuesto comprometido</span>
-          <span>${w.isCurrentMonth ? `Te quedan ${w.daysLeft} días (~${money(w.dailyBudget)}/día)` : "Mes cerrado"}</span>
+          <span>${w.isCurrentMonth ? `Te quedan ${w.daysLeft} días (~${money(w.dailyBudget || (displayAmount > 0 ? displayAmount / w.daysLeft : 0))}/día)` : "Mes cerrado"}</span>
         </div>
       </div>
 
@@ -168,8 +186,8 @@ function carteraTab(state, w, sum) {
           <div class="mb-top">
             <small>Dinero Libre Restante</small>
           </div>
-          <b class="num ${w.remainingFree >= 0 ? "pos" : "neg"}">${signed(w.remainingFree)}</b>
-          <span class="mb-sub">${w.remainingFree >= 0 ? `~${money(w.dailyBudget)} por día` : "En descubierto"}</span>
+          <b class="num ${displayAmount >= 0 ? "pos" : "neg"}">${displayAmount >= 0 ? "+" : ""}${money(displayAmount)}</b>
+          <span class="mb-sub">${dailySub}</span>
         </div>
       </div>
     </section>
@@ -382,6 +400,7 @@ export function mount(root, state, signal) {
         }
         case "new-tx": openTxForm(); break;
         case "import-bank": openBankImportModal(ui.acc); break;
+        case "adjust-balance": openAdjustBalanceModal(id || ui.acc); break;
         case "edit-tx": openTxForm({ id }); break;
         case "transfer": openTxForm({ type: "transfer" }); break;
         case "new-account": openAccountForm(); break;

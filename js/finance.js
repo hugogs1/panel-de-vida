@@ -206,7 +206,21 @@ export function reconcileFinance(state) {
     fin.transactions = fin.transactions.filter(t => !toRemoveIds.has(t.id));
   }
 
-  // 3. Re-evaluar categorización de movimientos bancarios que hayan quedado como "c-otros" o "c-otrosing"
+  // 3. Si demo está desactivado, limpiar reglas residuales de demo que no tengan correspondencia real
+  if (!state.settings?.demo && fin.recurring?.length) {
+    const demoRuleIds = new Set(["rec-alquiler", "rec-netflix", "rec-gym"]);
+    const hasResidualDemoRules = fin.recurring.some(r => demoRuleIds.has(r.id));
+    if (hasResidualDemoRules) {
+      const realMatches = fin.transactions.some(t => !t.auto && demoRuleIds.has(t.recurringId));
+      if (!realMatches) {
+        fin.recurring = fin.recurring.filter(r => !demoRuleIds.has(r.id));
+        fin.transactions = fin.transactions.filter(t => !t.auto || !demoRuleIds.has(t.recurringId));
+        changes++;
+      }
+    }
+  }
+
+  // 4. Re-evaluar categorización de movimientos bancarios que hayan quedado como "c-otros" o "c-otrosing"
   for (const t of fin.transactions) {
     if (t.source === "banco" && (t.categoryId === "c-otros" || t.categoryId === "c-otrosing" || !t.categoryId)) {
       const betterCat = guessCategory(t.note, t.amount, fin.transactions);
@@ -223,10 +237,13 @@ export function reconcileFinance(state) {
 /** Muta el estado: crea los movimientos de fijos vencidos sin duplicar los ya cargados. Devuelve cuántos ha creado. */
 export function applyRecurring(state, today = iso()) {
   let created = 0;
+  const isDemo = state.settings?.demo === true;
   for (const r of state.finance.recurring) {
     if (r.active === false || !r.nextDate) continue;
+    // Omitir reglas de demo si el modo demo no está activo
+    if (!isDemo && (r.id === "rec-alquiler" || r.id === "rec-netflix" || r.id === "rec-gym")) continue;
     let guard = 0;
-    while (r.nextDate <= today && guard++ < 400) {
+    while (r.nextDate <= today && guard++ < 36) {
       if (state.finance.accounts.some(a => a.id === r.accountId)) {
         const ym = r.nextDate.slice(0, 7);
         const rName = norm(r.name);
