@@ -6,7 +6,6 @@ import { getState } from "../state.js";
 import { icon } from "../icons.js";
 import { addDays, parseISO } from "../stats.js";
 import { stackChart, ring } from "../charts.js";
-import { registerQuickAction } from "../quickadd.js";
 import { KINDS, KIND_COLOR, LEARN_TYPES, fmtMin, fmtHours, weekBreakdown, weeksHistory, projectStats } from "../work.js";
 import { openTimeForm, openProjectForm, openProjectDetail, openLearnForm, stepLearn } from "./trabajo-forms.js";
 import { openWorkoutForm, openFutbolForm } from "./deporte-forms.js";
@@ -15,28 +14,7 @@ const ui = { tab: "tiempo", week: 0, archived: false };
 const TABS = { tiempo: "Tiempo", proyectos: "Proyectos", aprendizaje: "Aprendizaje" };
 const DAYS = ["L", "M", "X", "J", "V", "S", "D"];
 
-// Botón "+" → "Entreno o tiempo"
-registerQuickAction("train", () => {
-  const sheet = openSheet(`
-    <h2>¿Qué quieres apuntar?</h2>
-    <div class="quick-grid">
-      <button class="quick" type="button" data-pick="trabajo" style="--c:var(--work)">${icon.work}<b>Tiempo de trabajo</b><small>Horas en un proyecto o tarea</small></button>
-      <button class="quick" type="button" data-pick="estudio" style="--c:var(--cyan)">${icon.clock}<b>Tiempo de estudio</b><small>Clases, repaso, cursos…</small></button>
-      <button class="quick" type="button" data-pick="gym" style="--c:var(--hab)">${icon.dumbbell}<b>Gimnasio</b><small>Con tus rutinas</small></button>
-      <button class="quick" type="button" data-pick="futbol" style="--c:var(--hab)">${icon.ball}<b>Fútbol</b><small>Sesión y minutos</small></button>
-    </div>`);
-  sheet.addEventListener("click", e => {
-    const b = e.target.closest("[data-pick]");
-    if (!b) return;
-    closeSheet();
-    if (b.dataset.pick === "trabajo" || b.dataset.pick === "estudio") openTimeForm({ kind: b.dataset.pick });
-    else if (b.dataset.pick === "gym") {
-      if (getState().settings.gymSource === "hevy") toast("Apunta el entreno en Hevy y luego impórtalo en Hábitos → Gimnasio", { ms: 4000 });
-      else openWorkoutForm();
-    }
-    else openFutbolForm();
-  });
-});
+
 
 const fmtDay = s => { const t = new Intl.DateTimeFormat("es-ES", { weekday: "long", day: "numeric", month: "short" }).format(parseISO(s)); return t[0].toUpperCase() + t.slice(1); };
 const fmtShort = s => new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short" }).format(parseISO(s));

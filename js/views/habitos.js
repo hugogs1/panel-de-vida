@@ -6,7 +6,7 @@ import { icon } from "../icons.js";
 import { iso, addDays, parseISO } from "../stats.js";
 import { heatmap, stackChart, ring } from "../charts.js";
 import { registerQuickAction } from "../quickadd.js";
-import { update } from "../state.js";
+import { getState, update } from "../state.js";
 import { freqText, habitValue, setHabitValue, streaks, dayLevel, heatDays, habitsToday, isScheduled, isDone, AUTO_LABEL } from "../habits.js";
 import { records, sportSummary, wellbeingDays, workoutVolume, avg, kg, MOODS, MOOD_COLOR, QUALITY, FUTBOL_KINDS } from "../sport.js";
 import { openHabitForm, openHabitDetail, openDayLog } from "./habitos-forms.js";
@@ -20,8 +20,52 @@ const num = n => new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 }).fo
 const shortDate = s => new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short" }).format(parseISO(s)).replace(".", "");
 const dayName = s => { const t = new Intl.DateTimeFormat("es-ES", { weekday: "short", day: "numeric", month: "short" }).format(parseISO(s)).replace(/\./g, ""); return t[0].toUpperCase() + t.slice(1); };
 
-// Botón "+": registro del día; y gimnasio/fútbol desde "Entreno o tiempo"
+// Botón "+": registro del día; y entreno deportivo (gym, boxeo, fútbol)
 registerQuickAction("habit", () => openDayLog());
+registerQuickAction("train", () => {
+  const sheet = openSheet(`
+    <h2>¿Qué quieres apuntar?</h2>
+    <div class="quick-grid">
+      <button class="quick" type="button" data-pick="gym" style="--c:var(--hab)">${icon.dumbbell}<b>Gimnasio</b><small>${getState().settings.gymSource === "hevy" ? "Registrado con Hevy / Salud" : "Con tus rutinas"}</small></button>
+      <button class="quick" type="button" data-pick="boxeo" style="--c:var(--hab)">🥊<b>Boxeo</b><small>Marcar sesión de hoy</small></button>
+      <button class="quick" type="button" data-pick="futbol" style="--c:var(--hab)">${icon.ball}<b>Fútbol / Partido</b><small>Sesión y minutos</small></button>
+    </div>`);
+  sheet.addEventListener("click", e => {
+    const b = e.target.closest("[data-pick]");
+    if (!b) return;
+    closeSheet();
+    if (b.dataset.pick === "gym") {
+      if (getState().settings.gymSource === "hevy") {
+        toast("Se importa automáticamente desde Salud/Hevy, o en Ajustes → Hevy", { ms: 4000 });
+      } else {
+        openWorkoutForm();
+      }
+    } else if (b.dataset.pick === "boxeo") {
+      update(st => {
+        const today = iso();
+        st.habits.workouts = st.habits.workouts || [];
+        const existing = st.habits.workouts.find(w => w.date === today && w.sport === "boxeo");
+        if (existing) {
+          existing.minutes = (existing.minutes || 0) + 60;
+        } else {
+          st.habits.workouts.push({
+            id: `wo-boxeo-${today}-${Date.now().toString(36)}`,
+            date: today,
+            type: "deporte",
+            sport: "boxeo",
+            title: "Boxeo",
+            minutes: 60,
+            note: "Entrenamiento",
+            source: "manual"
+          });
+        }
+      });
+      toast("🥊 Sesión de Boxeo apuntada");
+    } else if (b.dataset.pick === "futbol") {
+      openFutbolForm();
+    }
+  });
+});
 
 export function render(state) {
   const today = iso();
