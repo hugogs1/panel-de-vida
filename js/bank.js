@@ -17,27 +17,37 @@ export const RULES = [
   // Supermercados y alimentación
   {
     cat: "c-comida-supermercado",
-    re: /mercadona|carrefour|lidl|alcampo|eroski|dia\b|aldi\b|hipercor|supercor|consum|bonpreu|ahorramas|coviran|costco|condis|spar\b|bm supermercados|hiperdino|froiz|gadis|la sirena|supermercad|hipermercad|fruteria|carniceria|pescaderia|panaderia|charcuteria|verduleria|alimentacion/i
+    re: /mercadona|carrefour|lidl|alcampo|eroski|dia\b|aldi\b|hipercor|supercor|consum|bonpreu|ahorramas|coviran|costco|condis|spar\b|bm supermercados|hiperdino|froiz|gadis|la sirena|supermercad|hipermercad|fruteria|carniceria|pescaderia|panaderia|charcuteria|verduleria|alimentacion|aliment\b|famishop/i
   },
   // Restaurantes, cafeterías, comida rápida y delivery
   {
     cat: "c-comida-restaurantes",
-    re: /restauran|burger king|burgerking|mcdonald|kfc\b|popeyes|taco bell|telepizza|domino'?s|dominospizza|foster'?s hollywood|fosters|ginos|vips\b|starbucks|tgb\b|the good burger|goiko|five guys|honest greens|tagliatella|100 montaditos|montaditos|pizzeria|taberna|cerveceria|tasca|meson|cafeteria|cafes\b|coffee|poke\b|sushi|churreria|bar\b|just eat|justeat|ubereats|uber eats|glovo|deliveroo/i
+    re: /restauran|burger king|burgerking|\bbk\d+|\bburger\b|mcdonald|kfc\b|popeyes|taco bell|telepizza|domino'?s|dominospizza|foster'?s hollywood|fosters|ginos|vips\b|starbucks|tgb\b|the good burger|goiko|five guys|honest greens|tagliatella|100 montaditos|montaditos|pizzeria|taberna|cerveceria|tasca|meson|cafeteria|cafes\b|coffee|poke\b|sushi|genbuki|churreria|\bselecta\b|bar\b|just eat|justeat|ubereats|uber eats|glovo|deliveroo/i
   },
   // Combustible y gasolineras
   {
     cat: "c-transporte-combustible",
-    re: /repsol|cepsa|bp\b|galp|shell|petronor|estacion de servicio|gasolinera|carburante|ballenoil|plenoil|petroprix|autonetoil|campsa|esso\b/i
+    re: /repsol|cepsa|bp\b|galp|shell|petronor|estacion de servicio|\be\.s\.\s|gasolinera|carburante|combustible|machupichu|ballenoil|plenoil|petroprix|autonetoil|campsa|esso\b/i
   },
   // Transporte público, viajes, peajes, parking y VTC
   {
     cat: "c-transporte-publico",
     re: /renfe|metro\b|emt\b|alsa|tmb\b|cercanias|ave\b|iryo|ouigo|billete|billetes|autopista|peaje|bip&drive|bip & drive|bip and drive|ap-?\d+|parking|aparcamiento|telpark|easypark|parclick|smou\b|bicing|bicimad|uber\b|cabify|freenow|free now|taxi|bolt\b|vueling|ryanair|iberia|air europa|europcar|sixt|avis\b/i
   },
+  // Ocio, salas, discotecas y salidas
+  {
+    cat: "c-ocio",
+    re: /sala\s+nazca|nazca|teatro|cine|kinepolis|cinesa|yelmo|concierto|festival|discoteca|pub\b|espectaculo|ocio/i
+  },
   // Suscripciones, streaming y software
   {
     cat: "c-subs",
-    re: /netflix|spotify|hbo\b|max\b|prime video|amazon prime|disney|dazn|filmin|crunchyroll|youtube|patreon|apple\.com\/bill|itunes|google \*|google play|google storage|openai|chatgpt|anthropic|claude|playstation|psn\b|xbox|nintendo|steam\b|audible|dropbox|icloud/i
+    re: /netflix|spotify|hbo\b|max\b|prime video|amazon prime|disney|dazn|filmin|crunchyroll|youtube|patreon|apple\.?com[\/.]?bill|itunes|google \*|google play|google storage|openai|chatgpt|anthropic|claude|playstation|psn\b|xbox|nintendo|steam\b|audible|dropbox|icloud/i
+  },
+  // Formación y universidad
+  {
+    cat: "c-formacion",
+    re: /ucjc|universidad|colegio|instituto|academia|campus|curso|matricula/i
   },
   // Gimnasio, boxeo y deporte
   {
@@ -65,12 +75,16 @@ export const RULES = [
   // Compras, moda y tecnología
   {
     cat: "c-compras",
-    re: /amazon|zara\b|bershka|pull and bear|pull&bear|mango\b|stradivarius|massimo dutti|oysho|el corte ingles|corte ingles|primark|shein|temu\b|aliexpress|ikea|leroy merlin|mediamarkt|media markt|pccomponentes|pc componentes|fnac|apple store/i
+    re: /amazon|zara\b|bershka|pull and bear|pull&bear|mango\b|stradivarius|massimo dutti|oysho|el corte ingles|corte ingles|primark|shein|temu\b|aliexpress|ikea|leroy merlin|mediamarkt|media markt|\bmm\s+vaguada|pccomponentes|pc componentes|fnac|apple store|alcala de henares/i
   },
-  // Ingresos: Nómina, pensiones, transferencias a favor y Bizum recibido
+  // Ingresos: Nómina, federación/árbitros, pensiones, transferencias a favor y Bizum recibido
   {
     cat: "c-nomina",
     re: /nomina|sueldo|salario|pension|haberes/i
+  },
+  {
+    cat: "c-extras",
+    re: /real federacion de futbol|federacion de futbol|rffm|arbitr/i
   },
   {
     cat: "c-otrosing",
@@ -375,9 +389,14 @@ export function parseBankCSV(text, existingTxs = []) {
  * Aplica los movimientos importados al estado, filtrando duplicados existentes en la cuenta seleccionada
  * y vinculando automáticamente con los gastos fijos configurados.
  */
-export function applyBankImport(state, accountId, parsedTransactions) {
+export function applyBankImport(state, accountId, parsedTransactions, { replaceExisting = false } = {}) {
   if (!state.finance.accounts.some(a => a.id === accountId)) {
     throw new Error("La cuenta seleccionada no existe.");
+  }
+
+  // Si se solicita sustituir, se eliminan los movimientos previos de esta cuenta
+  if (replaceExisting) {
+    state.finance.transactions = state.finance.transactions.filter(t => t.accountId !== accountId);
   }
 
   const existing = state.finance.transactions.filter(t => t.accountId === accountId);

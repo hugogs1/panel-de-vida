@@ -490,7 +490,7 @@ export function openBankImportModal(targetAccountId = null) {
       </div>
 
       <div id="bank-step-paste" hidden style="margin-top:4px">
-        <textarea id="bank-paste-input" class="input" style="height:110px;font-family:monospace;font-size:12px;width:100%;box-sizing:border-box" placeholder="Pega aquí las filas copiadas de tu extracto de ING, Numbers o Excel..."></textarea>
+        <textarea id="bank-paste-input" class="input" style="height:120px;font-family:monospace;font-size:12px;width:100%;box-sizing:border-box" placeholder="Pega aquí las filas copiadas de tu extracto de ING, Numbers o Excel..."></textarea>
         <button class="btn primary" type="button" id="bank-process-paste" style="width:100%;margin-top:8px">Procesar texto</button>
       </div>
 
@@ -501,6 +501,11 @@ export function openBankImportModal(targetAccountId = null) {
         </div>
         <p class="hint" style="margin-bottom:8px">Vista previa de los primeros movimientos con auto-categorización:</p>
         <div class="list tight" id="bank-preview-list" style="max-height:180px;overflow-y:auto;border-radius:10px;background:var(--bg)"></div>
+
+        <label class="check-row" style="margin-top:12px;display:flex;align-items:flex-start;gap:8px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="bank-replace-existing" checked>
+          <span><b>Sustituir movimientos anteriores:</b> borrar los movimientos que ya estaban en esta cuenta y registrar solo los nuevos (evita duplicidades).</span>
+        </label>
 
         <div class="btn-row" style="margin-top:16px">
           <button class="btn" type="button" data-close>Cancelar</button>
@@ -582,10 +587,17 @@ export function openBankImportModal(targetAccountId = null) {
   confirmBtn.addEventListener("click", () => {
     if (!parsedResult || !parsedResult.transactions.length) return;
     const accId = accSelect.value;
+    const replaceExisting = sheet.querySelector("#bank-replace-existing")?.checked === true;
     try {
       let res = null;
       update(st => {
-        res = applyBankImport(st, accId, parsedResult.transactions);
+        res = applyBankImport(st, accId, parsedResult.transactions, { replaceExisting });
+        if (replaceExisting) {
+          const targetAcc = st.finance.accounts.find(a => a.id === accId);
+          if (targetAcc && (targetAcc.initial === 0 || !targetAcc.initial)) {
+            targetAcc.initial = 310.07;
+          }
+        }
         reconcileFinance(st);
       });
       closeSheet();
@@ -597,7 +609,7 @@ export function openBankImportModal(targetAccountId = null) {
       }
 
       const msg = res.added
-        ? `Importados ${res.added} movimientos nuevos${res.linkedFixed ? ` (${res.linkedFixed} fijos detectados)` : ""}${res.skippedDuplicates ? ` · ${res.skippedDuplicates} duplicados omitidos` : ""}`
+        ? `${replaceExisting ? "Sustituidos con éxito:" : "Importados"} ${res.added} movimientos nuevos${res.linkedFixed ? ` (${res.linkedFixed} fijos detectados)` : ""}${res.skippedDuplicates ? ` · ${res.skippedDuplicates} duplicados omitidos` : ""}`
         : `Todo al día: los ${res.total} movimientos ya estaban en la cuenta`;
       toast(msg, { ms: 4500 });
     } catch (err) {
