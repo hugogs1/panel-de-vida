@@ -101,7 +101,11 @@ export function parseHevy(text) {
 export function applyHevy(s, workouts) {
   let added = 0, updated = 0;
   for (const w of workouts) {
-    const i = s.habits.workouts.findIndex(x => x.id === w.id);
+    let i = s.habits.workouts.findIndex(x => x.id === w.id);
+    if (i < 0) {
+      // Reemplaza posibles entradas vacias/placeholders del buzon de Atajos en la misma fecha
+      i = s.habits.workouts.findIndex(x => x.date === w.date && (x.type === "gym" || (!x.type && !x.sport)) && (!x.exercises || x.exercises.length === 0));
+    }
     if (i < 0) { s.habits.workouts.push(w); added++; }
     else if (JSON.stringify(s.habits.workouts[i]) !== JSON.stringify(w)) { s.habits.workouts[i] = w; updated++; }
   }
