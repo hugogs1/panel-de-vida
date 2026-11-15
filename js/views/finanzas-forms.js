@@ -456,12 +456,22 @@ export function openBankImportModal(targetAccountId = null) {
     <form class="form" id="bank-import-form" novalidate>
       ${field("Cuenta de destino", "bank-acc", `<select class="input" id="bank-acc">${accs.map(a => `<option value="${a.id}"${a.id === initialAcc ? " selected" : ""}>${esc(a.name)}</option>`).join("")}</select>`)}
 
+      <div class="chips" role="tablist" style="margin:6px 0 10px">
+        <button type="button" class="chip" id="btn-mode-file" aria-selected="true">Subir archivo CSV</button>
+        <button type="button" class="chip" id="btn-mode-paste" aria-selected="false">Pegar texto copiado</button>
+      </div>
+
       <div id="bank-step-upload">
-        <label class="btn primary" for="bank-file-input" style="width:100%;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;">
+        <label class="btn primary" for="bank-file-input" style="width:100%;margin-top:4px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;">
           ${icon.upload} Seleccionar archivo CSV / Extracto
         </label>
         <input type="file" id="bank-file-input" class="sr-only" accept=".csv,.txt,.tsv,text/csv,text/plain">
-        <p class="hint" style="text-align:center;margin-top:8px">Compatible con BBVA, Santander, CaixaBank, ING, Sabadell, Revolut y cualquier banco que exporte en CSV.</p>
+        <p class="hint" style="text-align:center;margin-top:8px">Compatible con ING, BBVA, Santander, CaixaBank, Sabadell y Revolut.</p>
+      </div>
+
+      <div id="bank-step-paste" hidden style="margin-top:4px">
+        <textarea id="bank-paste-input" class="input" style="height:110px;font-family:monospace;font-size:12px;width:100%;box-sizing:border-box" placeholder="Pega aquí las filas copiadas de tu extracto de ING, Numbers o Excel..."></textarea>
+        <button class="btn primary" type="button" id="bank-process-paste" style="width:100%;margin-top:8px">Procesar texto</button>
       </div>
 
       <div id="bank-preview" hidden style="margin-top:14px">
@@ -481,6 +491,11 @@ export function openBankImportModal(targetAccountId = null) {
 
   const fileInput = sheet.querySelector("#bank-file-input");
   const uploadBlock = sheet.querySelector("#bank-step-upload");
+  const pasteBlock = sheet.querySelector("#bank-step-paste");
+  const pasteInput = sheet.querySelector("#bank-paste-input");
+  const processPasteBtn = sheet.querySelector("#bank-process-paste");
+  const btnModeFile = sheet.querySelector("#btn-mode-file");
+  const btnModePaste = sheet.querySelector("#btn-mode-paste");
   const previewBlock = sheet.querySelector("#bank-preview");
   const countVal = sheet.querySelector("#bank-count-val");
   const datesVal = sheet.querySelector("#bank-dates-val");
@@ -488,26 +503,56 @@ export function openBankImportModal(targetAccountId = null) {
   const confirmBtn = sheet.querySelector("#bank-confirm-btn");
   const accSelect = sheet.querySelector("#bank-acc");
 
+  const showPreview = (text) => {
+    const currentTxs = getState().finance.transactions;
+    parsedResult = parseBankCSV(text, currentTxs);
+
+    countVal.textContent = `${parsedResult.totalCount} (${parsedResult.expensesCount} gastos, ${parsedResult.incomesCount} ingresos)`;
+    datesVal.textContent = `${parsedResult.fromDate} a ${parsedResult.toDate}`;
+
+    previewList.innerHTML = parsedResult.transactions.slice(0, 5).map(t => `
+      <div class="item" style="padding:8px 10px;font-size:13px">
+        <span class="t"><b>${esc(t.note)}</b><small>${t.date} · ${catLabel(getState(), t.categoryId)}</small></span>
+        <b class="num ${t.amount > 0 ? "pos" : "neg"}">${t.amount > 0 ? "+" : ""}${money(t.amount)}</b>
+      </div>`).join("");
+
+    previewBlock.hidden = false;
+    uploadBlock.style.opacity = "0.5";
+    if (pasteBlock) pasteBlock.style.opacity = "0.5";
+  };
+
+  btnModeFile.addEventListener("click", () => {
+    btnModeFile.setAttribute("aria-selected", "true");
+    btnModePaste.setAttribute("aria-selected", "false");
+    uploadBlock.hidden = false;
+    pasteBlock.hidden = true;
+  });
+
+  btnModePaste.addEventListener("click", () => {
+    btnModePaste.setAttribute("aria-selected", "true");
+    btnModeFile.setAttribute("aria-selected", "false");
+    uploadBlock.hidden = true;
+    pasteBlock.hidden = false;
+    setTimeout(() => pasteInput.focus(), 200);
+  });
+
+  processPasteBtn.addEventListener("click", () => {
+    const val = pasteInput.value.trim();
+    if (!val) { toast("Pega primero las filas del extracto", { error: true }); return; }
+    try {
+      showPreview(val);
+    } catch (err) {
+      toast(err.message || "No se pudo interpretar el texto copiado", { error: true, ms: 4000 });
+    }
+  });
+
   fileInput.addEventListener("change", async e => {
     const file = e.target.files[0];
     if (!file) return;
     try {
       toast("Leyendo extracto...", { ms: 1500 });
       const text = await file.text();
-      const currentTxs = getState().finance.transactions;
-      parsedResult = parseBankCSV(text, currentTxs);
-
-      countVal.textContent = `${parsedResult.totalCount} (${parsedResult.expensesCount} gastos, ${parsedResult.incomesCount} ingresos)`;
-      datesVal.textContent = `${parsedResult.fromDate} a ${parsedResult.toDate}`;
-
-      previewList.innerHTML = parsedResult.transactions.slice(0, 5).map(t => `
-        <div class="item" style="padding:8px 10px;font-size:13px">
-          <span class="t"><b>${esc(t.note)}</b><small>${t.date} · ${catLabel(getState(), t.categoryId)}</small></span>
-          <b class="num ${t.amount > 0 ? "pos" : "neg"}">${t.amount > 0 ? "+" : ""}${money(t.amount)}</b>
-        </div>`).join("");
-
-      previewBlock.hidden = false;
-      uploadBlock.style.opacity = "0.5";
+      showPreview(text);
     } catch (err) {
       toast(err.message || "No se pudo interpretar el archivo bancario", { error: true, ms: 4000 });
       e.target.value = "";
