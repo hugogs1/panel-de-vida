@@ -72,6 +72,14 @@ function parseBankDate(raw) {
     if (year.length === 2) year = (Number(year) > 70 ? "19" : "20") + year;
     return `${year}-${month}-${day}`;
   }
+  // Formato DD/MM (típico de extractos bancarios en PDF como ING)
+  const mShort = s.match(/^(\d{1,2})[/.-](\d{1,2})$/);
+  if (mShort) {
+    const day = mShort[1].padStart(2, "0");
+    const month = mShort[2].padStart(2, "0");
+    const year = new Date().getFullYear();
+    return `${year}-${month}-${day}`;
+  }
   return null;
 }
 
@@ -274,6 +282,23 @@ export function parseBankCSV(text, existingTxs = []) {
       note,
       categoryId
     });
+  }
+
+  // Si la separación por columnas tradicionales no encontró movimientos,
+  // probar el parser de líneas continuas tipo PDF (ej. texto copiado de un PDF de ING)
+  if (!transactions.length) {
+    const pdfLineRe = /^(\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?)\s+(?:(?:\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?)\s+)?(.+?)\s+([+-]?[\d.,]+)\s*€?(?:\s+([+-]?[\d.,]+)\s*€?)?$/;
+    for (const line of lines) {
+      const m = line.match(pdfLineRe);
+      if (!m) continue;
+      const date = parseBankDate(m[1]);
+      const amount = parseBankAmount(m[3]);
+      if (!date || isNaN(amount) || amount === 0) continue;
+      const note = cleanBankConcept(m[2]);
+      if (/saldo|periodo|extracto|titular|cuenta/i.test(note)) continue;
+      const categoryId = guessCategory(note, amount, existingTxs);
+      transactions.push({ date, amount, note, categoryId });
+    }
   }
 
   if (!transactions.length) {
