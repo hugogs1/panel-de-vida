@@ -2,9 +2,11 @@
 
 import { getState, update } from "../state.js";
 import { openSheet, closeSheet, toast, confirmSheet, esc, uid, money } from "../ui.js";
+import { icon } from "../icons.js";
 import { iso } from "../stats.js";
 import { seg, field } from "../forms.js";
-import { ACCOUNT_TYPES, FREQS, parseAmount, amountInput, applyRecurring, accountBalance, catById, checkExpenseViability } from "../finance.js";
+import { ACCOUNT_TYPES, FREQS, parseAmount, amountInput, applyRecurring, accountBalance, catById, catLabel, checkExpenseViability } from "../finance.js";
+import { parseBankCSV, applyBankImport } from "../bank.js";
 
 // ---------- Piezas comunes
 function categoryOptions(state, kind, selected) {
@@ -434,5 +436,99 @@ export function openMonthlyIncomeForm() {
     });
     closeSheet();
     toast(val > 0 ? `Ingreso mensual fijado en ${money(val)}` : "Ingreso mensual desactivado");
+  });
+}
+
+// ---------- Importar extracto bancario (CSV)
+export function openBankImportModal(targetAccountId = null) {
+  if (needAccounts()) return;
+  const s = getState();
+  const accs = s.finance.accounts;
+  const initialAcc = targetAccountId || accs[0].id;
+  let parsedResult = null;
+
+  const sheet = openSheet(`
+    <h2>Importar extracto de tu banco</h2>
+    <div class="banner" style="background:rgba(0,240,255,0.08);border:1px solid rgba(0,240,255,0.2);border-radius:12px;padding:12px 14px;margin:8px 0 16px;font-size:12px;line-height:1.5;color:#E5E5EA;">
+      🔒 <b>100% privado y seguro:</b> El extracto se procesa directamente en tu iPhone. Ningún dato bancario, saldo ni número de cuenta sale de tu dispositivo.
+    </div>
+
+    <form class="form" id="bank-import-form" novalidate>
+      ${field("Cuenta de destino", "bank-acc", `<select class="input" id="bank-acc">${accs.map(a => `<option value="${a.id}"${a.id === initialAcc ? " selected" : ""}>${esc(a.name)}</option>`).join("")}</select>`)}
+
+      <div id="bank-step-upload">
+        <label class="btn primary" for="bank-file-input" style="width:100%;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;">
+          ${icon.upload} Seleccionar archivo CSV / Extracto
+        </label>
+        <input type="file" id="bank-file-input" class="sr-only" accept=".csv,.txt,.tsv,text/csv,text/plain">
+        <p class="hint" style="text-align:center;margin-top:8px">Compatible con BBVA, Santander, CaixaBank, ING, Sabadell, Revolut y cualquier banco que exporte en CSV.</p>
+      </div>
+
+      <div id="bank-preview" hidden style="margin-top:14px">
+        <div class="split" style="margin-bottom:10px">
+          <div><small>Movimientos encontrados</small><b class="num pos" id="bank-count-val">0</b></div>
+          <div><small>Rango de fechas</small><b id="bank-dates-val" style="font-size:13px">—</b></div>
+        </div>
+        <p class="hint" style="margin-bottom:8px">Vista previa de los primeros movimientos con auto-categorización:</p>
+        <div class="list tight" id="bank-preview-list" style="max-height:180px;overflow-y:auto;border-radius:10px;background:var(--bg)"></div>
+
+        <div class="btn-row" style="margin-top:16px">
+          <button class="btn" type="button" data-close>Cancelar</button>
+          <button class="btn primary" type="button" id="bank-confirm-btn">Confirmar e importar</button>
+        </div>
+      </div>
+    </form>`);
+
+  const fileInput = sheet.querySelector("#bank-file-input");
+  const uploadBlock = sheet.querySelector("#bank-step-upload");
+  const previewBlock = sheet.querySelector("#bank-preview");
+  const countVal = sheet.querySelector("#bank-count-val");
+  const datesVal = sheet.querySelector("#bank-dates-val");
+  const previewList = sheet.querySelector("#bank-preview-list");
+  const confirmBtn = sheet.querySelector("#bank-confirm-btn");
+  const accSelect = sheet.querySelector("#bank-acc");
+
+  fileInput.addEventListener("change", async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      toast("Leyendo extracto...", { ms: 1500 });
+      const text = await file.text();
+      const currentTxs = getState().finance.transactions;
+      parsedResult = parseBankCSV(text, currentTxs);
+
+      countVal.textContent = `${parsedResult.totalCount} (${parsedResult.expensesCount} gastos, ${parsedResult.incomesCount} ingresos)`;
+      datesVal.textContent = `${parsedResult.fromDate} a ${parsedResult.toDate}`;
+
+      previewList.innerHTML = parsedResult.transactions.slice(0, 5).map(t => `
+        <div class="item" style="padding:8px 10px;font-size:13px">
+          <span class="t"><b>${esc(t.note)}</b><small>${t.date} · ${catLabel(getState(), t.categoryId)}</small></span>
+          <b class="num ${t.amount > 0 ? "pos" : "neg"}">${t.amount > 0 ? "+" : ""}${money(t.amount)}</b>
+        </div>`).join("");
+
+      previewBlock.hidden = false;
+      uploadBlock.style.opacity = "0.5";
+    } catch (err) {
+      toast(err.message || "No se pudo interpretar el archivo bancario", { error: true, ms: 4000 });
+      e.target.value = "";
+    }
+  });
+
+  confirmBtn.addEventListener("click", () => {
+    if (!parsedResult || !parsedResult.transactions.length) return;
+    const accId = accSelect.value;
+    try {
+      let res = null;
+      update(st => {
+        res = applyBankImport(st, accId, parsedResult.transactions);
+      });
+      closeSheet();
+      const msg = res.added
+        ? `Importados ${res.added} movimientos nuevos${res.skippedDuplicates ? ` (${res.skippedDuplicates} duplicados omitidos)` : ""}`
+        : `Todo al día: los ${res.total} movimientos ya estaban en la cuenta`;
+      toast(msg, { ms: 4500 });
+    } catch (err) {
+      toast(err.message || "Error al aplicar importación", { error: true });
+    }
   });
 }

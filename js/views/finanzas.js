@@ -13,7 +13,7 @@ import {
 } from "../finance.js";
 import {
   openTxForm, openAccountForm, openRecurringForm, openGoalForm,
-  openContribute, openCategories, openMonthlyIncomeForm
+  openContribute, openCategories, openMonthlyIncomeForm, openBankImportModal
 } from "./finanzas-forms.js";
 
 // Estado de la pantalla (no se guarda): pestaña, mes visible y simulador
@@ -211,6 +211,7 @@ function carteraTab(state, w, sum) {
           <p class="hint">Registra un gasto o ingreso al momento.</p>
           <div class="btn-row" style="margin-top:12px">
             <button class="btn small primary" type="button" data-act="new-tx">${icon.plus} Nuevo gasto / ingreso</button>
+            <button class="btn small" type="button" data-act="import-bank">${icon.upload} Importar banco</button>
             <button class="btn small" type="button" data-act="set-income">Sueldo mensual</button>
           </div>
         </div>
@@ -252,7 +253,11 @@ function movsTab(state) {
   const txs = fin.transactions
     .filter(t => t.date.startsWith(ui.ym) && !(t.transferId && t.amount > 0))
     .sort((a, b) => b.date.localeCompare(a.date));
-  const add = `<div class="btn-row"><button class="btn primary" type="button" data-act="new-tx">${icon.plus} Nuevo movimiento</button></div>`;
+  const add = `
+    <div class="btn-row" style="margin-bottom:12px">
+      <button class="btn primary" type="button" data-act="new-tx">${icon.plus} Nuevo movimiento</button>
+      <button class="btn" type="button" data-act="import-bank">${icon.upload} Importar banco (CSV)</button>
+    </div>`;
   if (!txs.length) return `<section class="card">${add}<div class="empty">No hay movimientos en ${monthLabel(ui.ym).toLowerCase()}.</div></section>`;
 
   const days = new Map();
@@ -328,6 +333,7 @@ function cuentasTab(state) {
   return `<section class="card">
     <div class="btn-row">
       <button class="btn primary" type="button" data-act="new-account">${icon.plus} Nueva cuenta</button>
+      <button class="btn" type="button" data-act="import-bank">${icon.upload} Importar extracto</button>
       ${accs.length > 1 ? `<button class="btn" type="button" data-act="transfer">⇄ Transferir</button>` : ""}
     </div>
     <div class="list">${accs.map(a => {
@@ -368,6 +374,7 @@ export function mount(root, state, signal) {
           break;
         }
         case "new-tx": openTxForm(); break;
+        case "import-bank": openBankImportModal(ui.acc); break;
         case "edit-tx": openTxForm({ id }); break;
         case "transfer": openTxForm({ type: "transfer" }); break;
         case "new-account": openAccountForm(); break;
