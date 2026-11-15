@@ -116,6 +116,18 @@ function parseBankAmount(raw) {
  */
 function cleanBankConcept(str) {
   let s = String(str || "").trim().replace(/^['"]|['"]$/g, "");
+
+  // 1. Anonimización y seguridad: Eliminar cualquier IBAN (ej. ES21 1465... o ES211465...)
+  s = s.replace(/\b[A-Z]{2}\d{2}[\s\d]{10,30}\b/gi, "");
+  // 2. Eliminar números de tarjeta de crédito o máscaras (ej. 1234 **** **** 5678 o **** 1234)
+  s = s.replace(/\b(\d{4}[\s-]?){3,4}\d{4}\b/g, "");
+  s = s.replace(/\b(\*{3,4}[\s-]?)+\d{2,4}\b/g, "");
+  // 3. Eliminar DNI / NIE (ej. 12345678A o X1234567B)
+  s = s.replace(/\b\d{8}[A-HJ-NP-TV-Z]\b/gi, "");
+  s = s.replace(/\b[XYZ]\d{7}[A-HJ-NP-TV-Z]\b/gi, "");
+  // 4. Eliminar etiquetas bancarias como "CTA: ...", "IBAN: ...", "TITULAR: ..."
+  s = s.replace(/\b(iban|cta|cuenta|nif|cif|titular|ordenante|beneficiario)\s*[:=]?\s*[\w\d.-]+/gi, "");
+
   // Quitar prefijos bancarios ruidosos habituales
   s = s.replace(/^(compra en|pago con tarjeta en|pago en|transferencia de|transferencia a|recibo de|adeudo de|abono de|bizum a favor de|bizum de|pago bizum)\s+/i, "");
   // Normalizar espacios múltiples
